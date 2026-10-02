@@ -91,7 +91,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     // to pair, so the withdrawal (same uniqueid) can't reach the host after it and drop it
     private static final Object pairingWithdrawLock = new Object();
     // Shell closes a pairing request that got no PIN after 300 s; a connection error after this
-    // long means the PIN window ran out
+    // long, while getservercert still waits for its answer, means the PIN window ran out
     private static final long PAIRING_PIN_WINDOW_MS = 290_000;
     // A PC paired while this activity was in the background (the Shell pairing page in the
     // browser): its app list opens from onResume(), since a background launch is blocked
@@ -452,6 +452,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 String message;
                 boolean success = false;
                 long pairingStartedAt = 0;
+                PairingManager pm = null;
                 try {
                     // Stop updates and wait while pairing
                     stopComputerUpdates(true);
@@ -477,7 +478,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                             }).start();
                         }));
 
-                        PairingManager pm = httpConn.getPairingManager();
+                        pm = httpConn.getPairingManager();
 
                         synchronized (pairingWithdrawLock) {
                             // Waits for an earlier, cancelled attempt's withdrawal to be sent
@@ -524,7 +525,9 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 } catch (XmlPullParserException | IOException e) {
                     e.printStackTrace();
                     message = ServerHelper.describeHostError(PcView.this, e);
+                    // Only while getservercert was waiting for the PIN: a later step failing is a real error
                     if (e instanceof IOException && !(e instanceof HostHttpResponseException) && pairingStartedAt != 0
+                            && !pm.isServerCertAnswered()
                             && SystemClock.elapsedRealtime() - pairingStartedAt >= PAIRING_PIN_WINDOW_MS) {
                         message = getResources().getString(R.string.hermit_pair_pin_timeout);
                     }

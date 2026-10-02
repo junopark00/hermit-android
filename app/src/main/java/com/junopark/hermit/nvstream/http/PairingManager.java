@@ -24,6 +24,9 @@ public class PairingManager {
     private byte[] pemCertBytes;
 
     private X509Certificate serverCert;
+
+    // Hermit: set once the host has answered getservercert, the step that waits for the PIN
+    private volatile boolean serverCertAnswered;
     
     public enum PairState {
         NOT_PAIRED,
@@ -182,6 +185,14 @@ public class PairingManager {
         return serverCert;
     }
 
+    /**
+     * Hermit: whether the host answered getservercert during pair(). A connection error before it
+     * can be the host closing a request that got no PIN in time; one after it cannot.
+     */
+    public boolean isServerCertAnswered() {
+        return serverCertAnswered;
+    }
+
     // Best-effort cleanup after a failed pairing step. Older hosts have no /unpair
     // route and answer 404, so a failure here must never replace the pairing result.
     private void cancelPairing() {
@@ -194,6 +205,7 @@ public class PairingManager {
 
     public PairState pair(String serverInfo, String pin) throws IOException, XmlPullParserException {
         PairingHashAlgorithm hashAlgo;
+        serverCertAnswered = false;
 
         int serverMajorVersion = http.getServerMajorVersion(serverInfo);
         HermitLog.info("Pairing with server generation: "+serverMajorVersion);
@@ -217,6 +229,7 @@ public class PairingManager {
         String getCert = http.executePairingCommand("phrase=getservercert&salt="+
                 bytesToHex(salt)+"&clientcert="+bytesToHex(pemCertBytes),
                 false);
+        serverCertAnswered = true;
         if (!NvHTTP.getXmlString(getCert, "paired", true).equals("1")) {
             return PairState.FAILED;
         }
