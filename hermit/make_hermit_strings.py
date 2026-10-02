@@ -457,12 +457,19 @@ hermit = [
 
     # Clipboard sync
     ('title_checkbox_clipboard_sync', 'Sync clipboard with the host', '호스트와 클립보드 동기화'),
-    ('summary_checkbox_clipboard_sync', 'What you copy on this device is sent to the host when you return to the stream, and what you copy on the host is brought back when you leave it. With a Shell host, images are synced too. Requires the clipboard permissions for this device on the host.',
-     '스트림으로 돌아오면 이 기기에서 복사한 내용을 호스트로 보내고, 스트림에서 나가면 호스트에서 복사한 내용을 가져옵니다. Shell 호스트에서는 이미지도 동기화합니다. 호스트에서 이 기기에 클립보드 권한이 있어야 합니다.'),
+    ('summary_checkbox_clipboard_sync', 'What you copy on this device is sent to the host when you return to the stream, and what you copy on the host is brought back when you leave it. With a Shell host, images are synced too; files are not synced. Requires the clipboard permissions for this device on the host.',
+     '스트림으로 돌아오면 이 기기에서 복사한 내용을 호스트로 보내고, 스트림에서 나가면 호스트에서 복사한 내용을 가져옵니다. Shell 호스트에서는 이미지도 동기화하며, 파일은 동기화하지 않습니다. 호스트에서 이 기기에 클립보드 권한이 있어야 합니다.'),
     ('hermit_clipboard_sent_text', 'Clipboard text sent to the host', '클립보드 텍스트를 호스트로 보냈습니다'),
     ('hermit_clipboard_sent_image', 'Clipboard image sent to the host', '클립보드 이미지를 호스트로 보냈습니다'),
-    ('hermit_clipboard_denied', 'The host does not allow clipboard sync for this device', '호스트가 이 기기의 클립보드 동기화를 허용하지 않습니다'),
+    ('hermit_clipboard_read_denied', 'The host does not allow reading its clipboard for this device', '호스트가 이 기기에 호스트 클립보드 읽기를 허용하지 않습니다'),
+    ('hermit_clipboard_write_denied', 'The host does not allow sending to its clipboard for this device', '호스트가 이 기기에 호스트 클립보드로 보내기를 허용하지 않습니다'),
     ('hermit_clipboard_too_large', 'The clipboard content is too large to send', '클립보드 내용이 너무 커서 보내지 못했습니다'),
+    ('hermit_clipboard_image_too_many_pixels', 'The clipboard image is too large to send (the host takes at most 8192×8192 pixels)', '클립보드 이미지가 너무 커서 보내지 못했습니다 (호스트는 최대 8192×8192 픽셀까지 받습니다)'),
+    ('hermit_clipboard_send_failed', 'Could not send the clipboard to the host', '클립보드를 호스트로 보내지 못했습니다'),
+    ('hermit_clipboard_images_need_shell', 'Clipboard images need a Shell host; only text is synced', '클립보드 이미지는 Shell 호스트에서만 동기화됩니다. 텍스트만 동기화합니다'),
+    ('hermit_clipboard_image_unreadable', 'Could not read the clipboard image', '클립보드 이미지를 읽지 못했습니다'),
+    ('hermit_clipboard_host_too_large', 'The host clipboard item is too large to bring to this device', '호스트 클립보드 항목이 너무 커서 이 기기로 가져오지 못했습니다'),
+    ('hermit_clipboard_files_not_synced', 'Files are not synced on Android; text and images only', 'Android에서는 파일을 동기화하지 않습니다. 텍스트와 이미지만 동기화합니다'),
 
     # Turning the host PC off or restarting it (PC list)
     ('hermit_power_menu_shutdown', 'Shut down PC…', 'PC 끄기…'),

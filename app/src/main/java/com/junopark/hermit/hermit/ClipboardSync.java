@@ -27,6 +27,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Clipboard sync between this device and the host while streaming, following Hermit for Windows:
@@ -39,6 +40,10 @@ import java.security.NoSuchAlgorithmException;
  * focus is lost, without any network I/O at that point.
  *
  * Text works with any host that has the clipboard endpoint; images need Shell's type=info/image extensions.
+ * Files are not synced in either direction (a notice says so once per stream).
+ *
+ * The host grants reading (GET) and setting (POST) its clipboard separately, so a refusal (401)
+ * stops only that direction.
  */
 public class ClipboardSync {
     private static final int EXTENDED_POLL_MS = 1000;
@@ -47,6 +52,9 @@ public class ClipboardSync {
     private static final int MAX_IMAGE_BYTES = 32 * 1024 * 1024;   // encoded PNG, same as the host
     private static final int MAX_SOURCE_IMAGE_BYTES = 64 * 1024 * 1024;
     private static final long MAX_CONVERTED_PIXELS = 16L * 1000 * 1000;
+    private static final long MAX_HOST_IMAGE_PIXELS = 8192L * 8192;  // Shell answers 413 above it
+    // legacyHostTextKey while the host text is too large to fetch
+    private static final String LEGACY_TOO_LARGE = "toolarge";
     private static final String STATE_PREFS = "HermitClipboard";
 
     private enum Mode { UNKNOWN, EXTENDED, LEGACY, DISABLED }
@@ -77,17 +85,30 @@ public class ClipboardSync {
     private Mode mode = Mode.UNKNOWN;
     private long hostSeq = -1;
     private String legacyHostTextKey;
-    private boolean reportedDenied;
+    // The host refused reading (GET) or setting (POST) its clipboard for this device (401):
+    // polling stops, or sending does, for the rest of the stream
+    private boolean readDenied;
+    private boolean writeDenied;
+    // The host did not answer type=info (401 before reading was allowed), so Extended is assumed
+    // for sending until an image is refused as an unknown type
+    private boolean modeAssumed;
+    private boolean reportedHostTooLarge;
+    // The clip whose failure was last reported: one notice per clip, not one per return
+    private String failureReportedKey;
     // A device clip that arrived before the host accepted clipboard calls (e.g. 403 right
     // after the stream started); sent once setup succeeds.
     private Runnable deferredPush;
 
     // Written by the worker, read on the UI thread
     private volatile HostContent pending;
+    private final AtomicBoolean filesNoticeShown = new AtomicBoolean();
 
     // UI thread state, persisted so a new stream does not resend what was already exchanged
     private String lastExchangedKey;
     private long lastSeenClipTimestamp;
+    // A device clip the host or this device refused for good (too large, unreadable, ...): not
+    // tried again on each return (the timestamp covers it where Android has one)
+    private String refusedKey;
 
     public ClipboardSync(Activity activity, NvHTTP http) {
         this.activity = activity;
@@ -162,7 +183,7 @@ public class ClipboardSync {
         }
         if (uri != null && clip.getDescription().hasMimeType("image/*")) {
             final String key = "image:" + uri + "@" + timestamp;
-            if (key.equals(lastExchangedKey)) {
+            if (key.equals(lastExchangedKey) || key.equals(refusedKey)) {
                 rememberSeen(timestamp);
                 return;
             }
@@ -176,14 +197,17 @@ public class ClipboardSync {
             text = item.coerceToText(appContext);
         }
         if (text == null || text.length() == 0) {
+            if (uri != null) {
+                showFilesNotice(); // a file (or other non-image content) copied on the device
+            }
             rememberSeen(timestamp);
             return;
         }
         final String value = text.toString();
         final String key = textKey(value);
-        if (key.equals(lastExchangedKey)) {
+        if (key.equals(lastExchangedKey) || key.equals(refusedKey)) {
             rememberSeen(timestamp);
-            return; // our own copy of host content, or text already sent
+            return; // our own copy of host content, or text already sent (or refused)
         }
         handler.post(() -> pushText(value, key, timestamp));
     }
@@ -194,6 +218,24 @@ public class ClipboardSync {
             rememberExchanged(key);
             rememberSeen(timestamp);
         });
+    }
+
+    /**
+     * Worker thread: a device clip was refused for good (too large, unreadable, or an image for a
+     * host without images): it is not sent again on the next return to the stream.
+     */
+    private void markRefused(String key, long timestamp) {
+        activity.runOnUiThread(() -> {
+            refusedKey = key;
+            rememberSeen(timestamp);
+        });
+    }
+
+    /** Any thread: files are not synced; said once per stream. */
+    private void showFilesNotice() {
+        if (!filesNoticeShown.getAndSet(true)) {
+            toast(R.string.hermit_clipboard_files_not_synced, HermitNotice.LONG);
+        }
     }
 
     /** The stream window lost focus: put the latest host content on the device clipboard. */
@@ -263,7 +305,17 @@ public class ClipboardSync {
             }
             mode = Mode.LEGACY;
         } catch (HostHttpResponseException e) {
-            if (!handleHttpError(e, "setup")) {
+            if (e.getErrorCode() == 401) {
+                // Reading is refused, which hides what the host supports; sending may still be
+                // allowed. Assume Shell (a text send works with any host) and fall back to text
+                // only if the host refuses an image as an unknown type.
+                handleReadError(e);
+                mode = Mode.EXTENDED;
+                modeAssumed = true;
+                runDeferredPush();
+                return;
+            }
+            if (!handleReadError(e)) {
                 return;
             }
             if (e.getErrorCode() != 400) {
@@ -281,10 +333,18 @@ public class ClipboardSync {
         HermitLog.info("Clipboard sync: host supports text only");
         try {
             legacyHostTextKey = textKey(new String(http.hermitGetClipboard("text", MAX_TEXT_BYTES), StandardCharsets.UTF_8));
+        } catch (HostHttpResponseException e) {
+            if (e.getErrorCode() == 413) {
+                legacyHostTextKey = LEGACY_TOO_LARGE; // there before the stream: nothing to say
+            } else {
+                handleReadError(e);
+            }
         } catch (IOException e) {
             HermitLog.warning("Clipboard: could not read the host text: " + e);
         }
-        schedulePoll(LEGACY_POLL_MS);
+        if (mode == Mode.LEGACY && !readDenied) {
+            schedulePoll(LEGACY_POLL_MS);
+        }
         runDeferredPush();
     }
 
@@ -310,7 +370,7 @@ public class ClipboardSync {
             init();
             return;
         }
-        if (mode == Mode.DISABLED) {
+        if (mode == Mode.DISABLED || readDenied) {
             return;
         }
         try {
@@ -320,7 +380,7 @@ public class ClipboardSync {
                 pollLegacy();
             }
         } catch (HostHttpResponseException e) {
-            if (!handleHttpError(e, "check")) {
+            if (!handleReadError(e)) {
                 return;
             }
         } catch (IOException e) {
@@ -338,31 +398,46 @@ public class ClipboardSync {
         String type = parseField(info, "type");
         hostSeq = seq;
 
-        if ("text".equals(type)) {
-            byte[] data = http.hermitGetClipboard("text", MAX_TEXT_BYTES);
-            if (data.length > 0) {
-                String text = new String(data, StandardCharsets.UTF_8);
-                pending = new HostContent(text, null, textKey(text));
-            }
-        } else if ("image".equals(type)) {
-            byte[] png = http.hermitGetClipboard("image", MAX_IMAGE_BYTES);
-            if (png.length > 0) {
-                String name = "host-" + System.currentTimeMillis() + "-" + seq + ".png";
-                File dir = ClipboardImageProvider.directory(appContext);
-                if (!dir.isDirectory() && !dir.mkdirs()) {
-                    throw new IOException("Cannot create " + dir);
+        // The host clipboard changed: whatever was fetched before is no longer what the user
+        // copied there last, so it is replaced, or dropped when nothing usable comes back.
+        HostContent content = null;
+        try {
+            if ("text".equals(type)) {
+                byte[] data = http.hermitGetClipboard("text", MAX_TEXT_BYTES);
+                if (data.length > 0) {
+                    String text = new String(data, StandardCharsets.UTF_8);
+                    content = new HostContent(text, null, textKey(text));
                 }
-                try (FileOutputStream out = new FileOutputStream(new File(dir, name))) {
-                    out.write(png);
+            } else if ("image".equals(type)) {
+                byte[] png = http.hermitGetClipboard("image", MAX_IMAGE_BYTES);
+                if (png.length > 0) {
+                    String name = "host-" + System.currentTimeMillis() + "-" + seq + ".png";
+                    File dir = ClipboardImageProvider.directory(appContext);
+                    if (!dir.isDirectory() && !dir.mkdirs()) {
+                        throw new IOException("Cannot create " + dir);
+                    }
+                    try (FileOutputStream out = new FileOutputStream(new File(dir, name))) {
+                        out.write(png);
+                    }
+                    content = new HostContent(null, name, "hostimage:" + seq + ":" + png.length);
+                    pruneImages(dir);
                 }
-                pending = new HostContent(null, name, "hostimage:" + seq + ":" + png.length);
-                pruneImages(dir);
+            } else if ("files".equals(type)) {
+                // Nothing this device can paste, and older text must not be applied instead
+                showFilesNotice();
             }
-        } else {
-            // Files (or nothing) on the host: nothing this device can paste, and older text
-            // must not be applied instead.
+        } catch (HostHttpResponseException e) {
             pending = null;
+            if (e.getErrorCode() == 413) {
+                reportHostTooLarge();
+                return;
+            }
+            throw e;
+        } catch (IOException e) {
+            pending = null;
+            throw e;
         }
+        pending = content;
     }
 
     /**
@@ -382,7 +457,21 @@ public class ClipboardSync {
     }
 
     private void pollLegacy() throws IOException {
-        byte[] data = http.hermitGetClipboard("text", MAX_TEXT_BYTES);
+        byte[] data;
+        try {
+            data = http.hermitGetClipboard("text", MAX_TEXT_BYTES);
+        } catch (HostHttpResponseException e) {
+            if (e.getErrorCode() != 413) {
+                throw e;
+            }
+            // The host text changed to something too large: the older text is not applied
+            if (!LEGACY_TOO_LARGE.equals(legacyHostTextKey)) {
+                legacyHostTextKey = LEGACY_TOO_LARGE;
+                pending = null;
+                reportHostTooLarge();
+            }
+            return;
+        }
         if (data.length == 0) {
             return;
         }
@@ -391,6 +480,13 @@ public class ClipboardSync {
         if (!key.equals(legacyHostTextKey)) {
             legacyHostTextKey = key;
             pending = new HostContent(text, null, key);
+        }
+    }
+
+    private void reportHostTooLarge() {
+        if (!reportedHostTooLarge) {
+            reportedHostTooLarge = true;
+            toast(R.string.hermit_clipboard_host_too_large, HermitNotice.LONG);
         }
     }
 
@@ -406,7 +502,8 @@ public class ClipboardSync {
         }
         byte[] data = text.getBytes(StandardCharsets.UTF_8);
         if (data.length > MAX_TEXT_BYTES) {
-            toast(R.string.hermit_clipboard_too_large);
+            reportSendFailure(key, R.string.hermit_clipboard_too_large);
+            markRefused(key, timestamp);
             return;
         }
         try {
@@ -414,11 +511,12 @@ public class ClipboardSync {
             recordHostSeq(reply);
             legacyHostTextKey = key;
             markSent(key, timestamp);
-            toast(R.string.hermit_clipboard_sent_text);
+            toast(R.string.hermit_clipboard_sent_text, HermitNotice.SHORT);
         } catch (HostHttpResponseException e) {
-            handleHttpError(e, "send");
+            handleSendError(e, key, timestamp, false);
         } catch (IOException e) {
             HermitLog.warning("Clipboard text not sent: " + e);
+            reportSendFailure(key, R.string.hermit_clipboard_send_failed); // tried again next time
         }
     }
 
@@ -434,6 +532,8 @@ public class ClipboardSync {
         }
         if (mode != Mode.EXTENDED) {
             HermitLog.info("Clipboard images need a Shell host; only text is synced");
+            reportSendFailure(key, R.string.hermit_clipboard_images_need_shell);
+            markRefused(key, timestamp);
             return;
         }
         byte[] png;
@@ -441,44 +541,67 @@ public class ClipboardSync {
             png = readAsPng(appContext.getContentResolver(), uri, mime);
         } catch (IOException | SecurityException e) {
             HermitLog.warning("Clipboard image could not be read: " + e);
+            reportSendFailure(key, R.string.hermit_clipboard_image_unreadable);
+            markRefused(key, timestamp);
             return;
         } catch (OutOfMemoryError e) {
             HermitLog.warning("Clipboard image too large to convert: " + e);
-            toast(R.string.hermit_clipboard_too_large);
+            reportSendFailure(key, R.string.hermit_clipboard_too_large);
+            markRefused(key, timestamp);
             return;
         }
         if (png == null || png.length > MAX_IMAGE_BYTES) {
-            toast(R.string.hermit_clipboard_too_large);
+            reportSendFailure(key, R.string.hermit_clipboard_too_large);
+            markRefused(key, timestamp);
+            return;
+        }
+        // Only the header is decoded: the host takes at most 8192x8192 pixels
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeByteArray(png, 0, png.length, bounds);
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            HermitLog.warning("Clipboard image could not be read: not a PNG");
+            reportSendFailure(key, R.string.hermit_clipboard_image_unreadable);
+            markRefused(key, timestamp);
+            return;
+        }
+        if ((long) bounds.outWidth * bounds.outHeight > MAX_HOST_IMAGE_PIXELS) {
+            reportSendFailure(key, R.string.hermit_clipboard_image_too_many_pixels);
+            markRefused(key, timestamp);
             return;
         }
         try {
             String reply = http.hermitSetClipboard("image", png, "image/png");
             recordHostSeq(reply);
+            modeAssumed = false;
             markSent(key, timestamp);
-            toast(R.string.hermit_clipboard_sent_image);
+            toast(R.string.hermit_clipboard_sent_image, HermitNotice.SHORT);
         } catch (HostHttpResponseException e) {
-            handleHttpError(e, "send image");
+            handleSendError(e, key, timestamp, true);
         } catch (IOException e) {
             HermitLog.warning("Clipboard image not sent: " + e);
+            reportSendFailure(key, R.string.hermit_clipboard_send_failed); // tried again next time
         }
     }
 
+    /** False when nothing can be sent now: the host is not ready yet, has no endpoint or refuses. */
     private boolean ensureReady() {
         if (mode == Mode.UNKNOWN) {
             init();
         }
-        return mode == Mode.EXTENDED || mode == Mode.LEGACY;
+        return (mode == Mode.EXTENDED || mode == Mode.LEGACY) && !writeDenied;
     }
 
-    /** Returns false if clipboard sync is off for the rest of the stream. */
-    private boolean handleHttpError(HostHttpResponseException e, String operation) {
+    /** A failed GET. Returns false if polling stops for the rest of the stream. */
+    private boolean handleReadError(HostHttpResponseException e) {
         switch (e.getErrorCode()) {
             case 401:
-                // The host did not give this device the clipboard permission.
-                mode = Mode.DISABLED;
-                if (!reportedDenied) {
-                    reportedDenied = true;
-                    toast(R.string.hermit_clipboard_denied);
+                // The host did not give this device the permission to read its clipboard;
+                // sending may still be allowed (a separate permission)
+                if (!readDenied) {
+                    readDenied = true;
+                    HermitLog.info("Clipboard sync: the host does not allow reading its clipboard");
+                    toast(R.string.hermit_clipboard_read_denied, HermitNotice.LONG);
                 }
                 return false;
             case 404:
@@ -486,17 +609,70 @@ public class ClipboardSync {
                 mode = Mode.DISABLED;
                 HermitLog.info("Clipboard sync: host has no clipboard endpoint");
                 return false;
-            case 413:
-                // Only for what the user sends; oversize host content is skipped quietly
-                // (a legacy host would otherwise report it on every poll).
-                if (operation.startsWith("send")) {
-                    toast(R.string.hermit_clipboard_too_large);
-                }
-                return true;
             default:
-                HermitLog.warning("Clipboard " + operation + " failed: HTTP " + e.getErrorCode());
+                // 413 is handled where content is fetched; a legacy host would report anything
+                // else on every poll, so it is only logged
+                HermitLog.warning("Clipboard check failed: HTTP " + e.getErrorCode());
                 return true;
         }
+    }
+
+    /** A failed POST of a device clip. */
+    private void handleSendError(HostHttpResponseException e, String key, long timestamp, boolean image) {
+        int code = e.getErrorCode();
+        HermitLog.warning("Clipboard " + (image ? "image" : "text") + " not sent: HTTP " + code);
+        switch (code) {
+            case 401:
+                // The host did not give this device the permission to set its clipboard;
+                // host changes still come back if reading is allowed
+                if (!writeDenied) {
+                    writeDenied = true;
+                    toast(R.string.hermit_clipboard_write_denied, HermitNotice.LONG);
+                }
+                return;
+            case 404:
+                mode = Mode.DISABLED;
+                HermitLog.info("Clipboard sync: host has no clipboard endpoint");
+                return;
+            case 413:
+                // Larger than the host takes (Shell: 32 MB or 8192x8192 pixels for an image)
+                reportSendFailure(key, R.string.hermit_clipboard_too_large);
+                markRefused(key, timestamp);
+                return;
+            case 400:
+                if (image && modeAssumed) {
+                    // The guess was wrong: a host without the image extension (text only)
+                    mode = Mode.LEGACY;
+                    modeAssumed = false;
+                    reportSendFailure(key, R.string.hermit_clipboard_images_need_shell);
+                    markRefused(key, timestamp);
+                    return;
+                }
+                break;
+            case 500:
+                if (image) {
+                    // The host could not take this image (e.g. could not decode it): sending it
+                    // again would fail the same way
+                    reportSendFailure(key, R.string.hermit_clipboard_send_failed);
+                    markRefused(key, timestamp);
+                    return;
+                }
+                break;
+            default:
+                break;
+        }
+        // Anything else (403 while the host sets up the stream, 500 for text, ...): said once
+        // for this clip and tried again on the next return to the stream
+        reportSendFailure(key, R.string.hermit_clipboard_send_failed);
+    }
+
+    /** A device clip could not be sent: said once per clip, however often it is tried. */
+    private void reportSendFailure(String key, int messageRes) {
+        if (key.equals(failureReportedKey)) {
+            return;
+        }
+        failureReportedKey = key;
+        toast(messageRes, HermitNotice.LONG);
     }
 
     private void recordHostSeq(String reply) {
@@ -506,11 +682,11 @@ public class ClipboardSync {
         }
     }
 
-    private void toast(int messageRes) {
+    private void toast(int messageRes, int length) {
         if (stopped) {
             return;
         }
-        activity.runOnUiThread(() -> HermitNotice.show(appContext, messageRes, HermitNotice.SHORT));
+        activity.runOnUiThread(() -> HermitNotice.show(appContext, messageRes, length));
     }
 
     // ---- Helpers --------------------------------------------------------------------------
@@ -519,7 +695,7 @@ public class ClipboardSync {
         byte[] data;
         try (InputStream in = resolver.openInputStream(uri)) {
             if (in == null) {
-                return null;
+                throw new IOException("Cannot open " + uri);
             }
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             byte[] chunk = new byte[64 * 1024];

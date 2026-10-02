@@ -276,15 +276,24 @@ Turn it on in Settings → Advanced, then choose **Performance overlay: metrics 
   what you copied on the host on the device clipboard (the same rules as Hermit for Windows).
 - Text works with Shell and other hosts that offer the same clipboard extension (for example Apollo).
   **Images (Shell)** are synced too: JPEG and WebP images from the device are converted to PNG (photos
-  above 16 megapixels are halved to avoid running out of memory), up to 32 MB. Content that could not
-  be sent is retried the next time you return to the stream.
+  above 16 megapixels are halved to avoid running out of memory), up to 32 MB and 8192×8192 pixels.
+- **Files are not synced** in either direction: copying a file on the device or on the host shows a
+  notice once per stream, and an older text or image is not pasted in its place. Only text and images
+  are synced.
+- Content that could not be sent (a network error, or a host that is not ready yet) is retried the
+  next time you return to the stream, with a notice once per item. Content that can never be sent (too
+  large, unreadable, or an image for a host without image support) is not retried until you copy
+  something else.
+- Host content too large to bring to the device (for example a huge image) is skipped with a notice
+  once, and the older host content is not put on the device clipboard instead.
 - Android only lets the visible app read the clipboard, and leaving the app ends the stream. Hermit
   therefore checks the host clipboard's change counter once a second while streaming, fetches changes
   ahead of time and puts them on the device clipboard the moment you leave.
 - Content already exchanged is not sent again, so Android's "pasted from clipboard" notice appears only
   for new content.
-- The host must grant this device clipboard permission; without it Hermit shows a notice once and stops
-  trying.
+- The host grants reading its clipboard and setting it separately (in Shell: **Clipboard Read** and
+  **Clipboard Set**). Without one of them Hermit shows a notice once and stops that direction only: for
+  example, with only Clipboard Set, what you copy on the device still reaches the host.
 - **Sync clipboard with the host** in Settings → Host settings (on by default).
 
 ## Automatic reconnect
