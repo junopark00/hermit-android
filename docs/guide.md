@@ -288,7 +288,8 @@ Turn it on in Settings → Advanced, then choose **Performance overlay: metrics 
   what you copied on the host on the device clipboard (the same rules as Hermit for Windows).
 - Text works with Shell and other hosts that offer the same clipboard extension (for example Apollo).
   **Images (Shell)** are synced too: JPEG and WebP images from the device are converted to PNG (photos
-  above 16 megapixels are halved to avoid running out of memory), up to 32 MB and 8192×8192 pixels.
+  above 16 megapixels are halved to avoid running out of memory, and photos are turned upright on
+  Android 7 and later), up to 32 MB and 8192×8192 pixels.
 - **Files are not synced** in either direction: copying a file on the device or on the host shows a
   notice once per stream, and an older text or image is not pasted in its place. Only text and images
   are synced.
@@ -297,10 +298,12 @@ Turn it on in Settings → Advanced, then choose **Performance overlay: metrics 
   Content that can never be sent (too large, unreadable) is not retried until you copy something
   else. Content the host refused (an image for a host without image support, or more than the host
   takes) is not retried during that stream; a later stream, for example to another host, tries it
-  again.
+  again. The same goes for a device image the host fails to set (HTTP 500) twice.
 - Host content too large to bring to the device (for example a huge image) is skipped with a notice
   once, and the older host content is not put on the device clipboard instead. The same goes for a
   host image the host could not convert to PNG: a notice says so once.
+- Host content that fails to arrive three times, or times out once, is given up until the host
+  clipboard changes again, with a notice once per stream.
 - While the host clipboard is busy (another program holding it open), Hermit fetches the host content
   again on the next check, and content sent from the device is retried on your next return to the
   stream. A host clipboard that stays busy for more than about ten seconds counts as a failed fetch.
