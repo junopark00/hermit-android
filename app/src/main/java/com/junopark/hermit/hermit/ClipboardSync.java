@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -53,6 +54,8 @@ public class ClipboardSync {
     private static final int MAX_SOURCE_IMAGE_BYTES = 64 * 1024 * 1024;
     private static final long MAX_CONVERTED_PIXELS = 16L * 1000 * 1000;
     private static final long MAX_HOST_IMAGE_PIXELS = 8192L * 8192;  // Shell answers 413 above it
+    // Failed fetches of one host clipboard item before it is given up on
+    private static final int MAX_HOST_FETCH_FAILURES = 3;
     // legacyHostTextKey while the host text is too large to fetch
     private static final String LEGACY_TOO_LARGE = "toolarge";
     private static final String STATE_PREFS = "HermitClipboard";
@@ -94,6 +97,11 @@ public class ClipboardSync {
     // for sending until an image is refused as an unknown type
     private boolean modeAssumed;
     private boolean reportedHostTooLarge;
+    // The host clipboard item (seq) whose fetch failed, and how often in a row: given up on after
+    // a few tries, or at once on a timeout, instead of fetched again every second
+    private long failedHostSeq = -1;
+    private int hostFetchFailures;
+    private boolean reportedHostFetchFailed;
     // The clip whose failure was last reported: one notice per clip, not one per return
     private String failureReportedKey;
     // A device clip that arrived before the host accepted clipboard calls (e.g. 403 right
@@ -435,8 +443,9 @@ public class ClipboardSync {
         // copied there last, so it is replaced, or dropped when nothing usable comes back.
         // hostSeq moves on once the content was fetched or is known to be unusable, so a fetch
         // that failed on the way (a network hiccup, the host clipboard busy) is tried again on
-        // the next poll.
+        // the next poll, a few times at most (hostFetchFailed).
         HostContent content = null;
+        File imageFile = null;
         try {
             if ("text".equals(type)) {
                 byte[] data = http.hermitGetClipboard("text", MAX_TEXT_BYTES);
@@ -452,7 +461,8 @@ public class ClipboardSync {
                     if (!dir.isDirectory() && !dir.mkdirs()) {
                         throw new IOException("Cannot create " + dir);
                     }
-                    try (FileOutputStream out = new FileOutputStream(new File(dir, name))) {
+                    imageFile = new File(dir, name);
+                    try (FileOutputStream out = new FileOutputStream(imageFile)) {
                         out.write(png);
                     }
                     content = new HostContent(null, name, "hostimage:" + seq + ":" + png.length);
@@ -469,13 +479,46 @@ public class ClipboardSync {
                 reportHostTooLarge();
                 return;
             }
+            if (e.getErrorCode() != 401 && e.getErrorCode() != 404) {
+                hostFetchFailed(seq, e); // 401 and 404 stop polling instead
+            }
             throw e;
         } catch (IOException e) {
             pending = null;
+            if (imageFile != null) {
+                // Partly written (storage full, ...): nothing points at it
+                //noinspection ResultOfMethodCallIgnored
+                imageFile.delete();
+            }
+            hostFetchFailed(seq, e);
             throw e;
         }
         hostSeq = seq;
         pending = content;
+    }
+
+    /**
+     * Fetching host clipboard item seq failed. A timeout (the host taking too long to encode a
+     * large image) or a third failure in a row gives up on it until the host clipboard changes
+     * again, instead of fetching it (and the host encoding it) every second for the rest of the
+     * stream.
+     */
+    private void hostFetchFailed(long seq, IOException e) {
+        if (seq != failedHostSeq) {
+            failedHostSeq = seq;
+            hostFetchFailures = 0;
+        }
+        hostFetchFailures++;
+        if (!(e instanceof SocketTimeoutException) && hostFetchFailures < MAX_HOST_FETCH_FAILURES) {
+            return; // tried again on the next poll
+        }
+        HermitLog.warning("Clipboard: gave up on the host clipboard item after " + hostFetchFailures
+                + " failed fetch(es): " + e);
+        hostSeq = seq;
+        if (!reportedHostFetchFailed) {
+            reportedHostFetchFailed = true;
+            toast(R.string.hermit_clipboard_host_fetch_failed, HermitNotice.LONG);
+        }
     }
 
     /**

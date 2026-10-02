@@ -474,6 +474,7 @@ hermit = [
     ('hermit_clipboard_images_need_shell', 'Clipboard images need a Shell host; only text is synced', '클립보드 이미지는 Shell 호스트에서만 동기화됩니다. 텍스트만 동기화합니다'),
     ('hermit_clipboard_image_unreadable', 'Could not read the clipboard image', '클립보드 이미지를 읽지 못했습니다'),
     ('hermit_clipboard_host_too_large', 'The host clipboard item is too large to bring to this device', '호스트 클립보드 항목이 너무 커서 이 기기로 가져오지 못했습니다'),
+    ('hermit_clipboard_host_fetch_failed', 'Could not bring the host clipboard item to this device', '호스트 클립보드 항목을 이 기기로 가져오지 못했습니다'),
     ('hermit_clipboard_files_not_synced', 'Files are not synced on Android; text and images only', 'Android에서는 파일을 동기화하지 않습니다. 텍스트와 이미지만 동기화합니다'),
 
     # Turning the host PC off or restarting it (PC list)
