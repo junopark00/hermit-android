@@ -56,6 +56,9 @@ public class ClipboardSync {
     private static final long MAX_HOST_IMAGE_PIXELS = 8192L * 8192;  // Shell answers 413 above it
     // Failed fetches of one host clipboard item before it is given up on
     private static final int MAX_HOST_FETCH_FAILURES = 3;
+    // HTTP 500s for one device image before this host is taken to refuse it
+    private static final int MAX_IMAGE_SERVER_ERRORS = 2;
+    private static final byte[] PNG_SIGNATURE = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
     // legacyHostTextKey while the host text is too large to fetch
     private static final String LEGACY_TOO_LARGE = "toolarge";
     private static final String STATE_PREFS = "HermitClipboard";
@@ -104,6 +107,9 @@ public class ClipboardSync {
     private boolean reportedHostFetchFailed;
     // The clip whose failure was last reported: one notice per clip, not one per return
     private String failureReportedKey;
+    // The device image the host last answered 500 for, and how often
+    private String serverErrorKey;
+    private int serverErrors;
     // A device clip that arrived before the host accepted clipboard calls (e.g. 403 right
     // after the stream started); sent once setup succeeds.
     private Runnable deferredPush;
@@ -730,12 +736,28 @@ public class ClipboardSync {
                     return;
                 }
                 break;
+            case 500:
+                if (image) {
+                    // Often transient (the host clipboard held open by another process), but an
+                    // image the host cannot take at all fails the same way on every return, each
+                    // time read again (Android's paste notice) and uploaded again
+                    if (!key.equals(serverErrorKey)) {
+                        serverErrorKey = key;
+                        serverErrors = 0;
+                    }
+                    if (++serverErrors >= MAX_IMAGE_SERVER_ERRORS) {
+                        reportSendFailure(key, R.string.hermit_clipboard_send_failed);
+                        markRefusedByHost(key, timestamp);
+                        return;
+                    }
+                }
+                break;
             default:
                 break;
         }
         // Anything else (403 while the host sets up the stream, 500 when the host clipboard was
-        // busy or an image could not be set, ...): said once for this clip and tried again on
-        // the next return to the stream
+        // busy or the first time an image could not be set, ...): said once for this clip and
+        // tried again on the next return to the stream
         reportSendFailure(key, R.string.hermit_clipboard_send_failed);
     }
 
@@ -781,10 +803,11 @@ public class ClipboardSync {
             }
             data = buffer.toByteArray();
         }
-        if ("image/png".equals(mime)) {
+        if (isPng(data)) {
             return data;
         }
-        // The host clipboard takes PNG; convert anything else (JPEG screenshots, WebP, ...).
+        // The host clipboard takes PNG; convert anything else (JPEG screenshots, WebP, ...),
+        // whatever the MIME type says: Shell answers 500 for bytes that are not PNG.
         // Photos from the camera can be 50 MP or more: downsample to at most 16 MP so the
         // conversion fits in memory.
         BitmapFactory.Options bounds = new BitmapFactory.Options();
@@ -803,6 +826,18 @@ public class ClipboardSync {
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, png);
         bitmap.recycle();
         return png.toByteArray();
+    }
+
+    private static boolean isPng(byte[] data) {
+        if (data.length < PNG_SIGNATURE.length) {
+            return false;
+        }
+        for (int i = 0; i < PNG_SIGNATURE.length; i++) {
+            if (data[i] != PNG_SIGNATURE[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static String textKey(String text) {
