@@ -1118,6 +1118,14 @@ public class StreamPanel {
         return Math.max(BITRATE_MIN, Math.min(BITRATE_MAX, (int) Math.round(kbps / 1000.0) * 1000));
     }
 
+    /**
+     * The bitrate the host streams at now: the start value, or the last one it applied live (from
+     * the panel, the quick menu or automatic bitrate).
+     */
+    public int appliedBitrate() {
+        return appliedBitrate;
+    }
+
     /** The chosen bitrate (the maximum when automatic bitrate is on). */
     public int chosenBitrate() {
         return prefs.getInt(BITRATE, startBitrate);

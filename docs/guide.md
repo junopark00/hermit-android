@@ -265,6 +265,8 @@ Turn it on in Settings → Advanced, then choose **Performance overlay: metrics 
     ≤ 8 ms good, > 16 ms poor; RTT ≤ 30 ms good, > 80 ms poor.
   - Average FPS is not rated: the host only sends frames when the screen changes, so a quiet screen
     gives a low number.
+  - The bitrate line shows the measured average next to the bitrate set at the end of the session,
+    including live changes from the panel, the quick menu or automatic bitrate.
 - Every session of 30 seconds or more is appended to `session-history.csv` in the app's private
   storage.
 - **Show a summary after each session** in Settings → Advanced (on by default), or **Don't show

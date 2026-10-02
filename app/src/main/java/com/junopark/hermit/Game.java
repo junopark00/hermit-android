@@ -2806,7 +2806,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         sessionSummaryRecorded = true;
         StreamStats stats = decoderRenderer.getHermitStreamStats();
         stats.targetFps = prefConfig.fps;
-        stats.bitrateKbps = prefConfig.bitrate;
+        // The bitrate in effect at the end: live changes (panel, quick menu, automatic bitrate)
+        // leave prefConfig at the bitrate the stream started with
+        stats.bitrateKbps = streamPanel != null ? streamPanel.appliedBitrate() : prefConfig.bitrate;
         SessionSummary summary = SessionSummary.from(stats, pcName, appName);
         if (summary != null) {
             SessionSummary.record(this, summary, prefConfig.hermit.sessionSummary);

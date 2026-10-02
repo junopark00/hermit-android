@@ -9,7 +9,7 @@ public class StreamStats {
     public int width, height;
     public String codec = "";
     public int targetFps;
-    public int bitrateKbps;          // requested bitrate
+    public int bitrateKbps;          // requested bitrate (the one in effect at the end)
 
     public long totalFrames;         // received + lost
     public long framesReceived;
