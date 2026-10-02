@@ -175,6 +175,8 @@ hermit = [
     ('hermit_action_delete', 'Delete', '삭제'),
     ('hermit_action_quit_app', 'Quit app', '앱 종료'),
     ('hermit_pair_cancelled', 'Pairing cancelled', '페어링을 취소했습니다'),
+    ('hermit_pair_pin_timeout', 'No PIN was entered on the host within 5 minutes. Tap the PC to pair again.',
+     '5분 안에 호스트에 PIN이 입력되지 않았습니다. PC를 다시 탭해 페어링하세요.'),
     ('hermit_pair_open_web', 'Open Shell pairing page', 'Shell 페어링 페이지 열기'),
     ('hermit_pair_open_web_help', 'The browser warns about the host\'s self-signed certificate and asks for the Shell web UI password; both are expected.',
      '브라우저가 호스트의 자체 서명 인증서를 경고하고 Shell 웹 UI 비밀번호를 묻는 것은 정상입니다.'),

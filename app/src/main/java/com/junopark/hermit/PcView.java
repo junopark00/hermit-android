@@ -15,6 +15,7 @@ import com.junopark.hermit.hermit.RemoteShutdown;
 import com.junopark.hermit.hermit.SessionSummary;
 import com.junopark.hermit.hermit.ShellPairingPage;
 import com.junopark.hermit.nvstream.http.ComputerDetails;
+import com.junopark.hermit.nvstream.http.HostHttpResponseException;
 import com.junopark.hermit.nvstream.http.NvApp;
 import com.junopark.hermit.nvstream.http.NvHTTP;
 import com.junopark.hermit.nvstream.http.PairingManager;
@@ -44,6 +45,7 @@ import android.opengl.GLSurfaceView;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.SystemClock;
 import android.preference.PreferenceManager;
 import android.util.TypedValue;
 import android.view.ContextMenu;
@@ -88,6 +90,9 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     // Held while a cancelled attempt is withdrawn; a newer attempt takes it before it asks the host
     // to pair, so the withdrawal (same uniqueid) can't reach the host after it and drop it
     private static final Object pairingWithdrawLock = new Object();
+    // Shell closes a pairing request that got no PIN after 300 s; a connection error after this
+    // long means the PIN window ran out
+    private static final long PAIRING_PIN_WINDOW_MS = 290_000;
     // A PC paired while this activity was in the background (the Shell pairing page in the
     // browser): its app list opens from onResume(), since a background launch is blocked
     private ComputerDetails pendingAppList;
@@ -446,6 +451,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 NvHTTP httpConn;
                 String message;
                 boolean success = false;
+                long pairingStartedAt = 0;
                 try {
                     // Stop updates and wait while pairing
                     stopComputerUpdates(true);
@@ -477,7 +483,9 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                             // Waits for an earlier, cancelled attempt's withdrawal to be sent
                         }
 
-                        PairState pairState = pm.pair(httpConn.getServerInfo(true), pinStr);
+                        String serverInfo = httpConn.getServerInfo(true);
+                        pairingStartedAt = SystemClock.elapsedRealtime();
+                        PairState pairState = pm.pair(serverInfo, pinStr);
                         if (pairState == PairState.PIN_WRONG) {
                             message = getResources().getString(R.string.pair_incorrect_pin);
                         }
@@ -516,6 +524,10 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 } catch (XmlPullParserException | IOException e) {
                     e.printStackTrace();
                     message = ServerHelper.describeHostError(PcView.this, e);
+                    if (e instanceof IOException && !(e instanceof HostHttpResponseException) && pairingStartedAt != 0
+                            && SystemClock.elapsedRealtime() - pairingStartedAt >= PAIRING_PIN_WINDOW_MS) {
+                        message = getResources().getString(R.string.hermit_pair_pin_timeout);
+                    }
                 }
 
                 if (cancelled.get() && !success) {

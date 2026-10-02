@@ -26,6 +26,7 @@
     <string name="hermit_action_delete">Delete</string>
     <string name="hermit_action_quit_app">Quit app</string>
     <string name="hermit_pair_cancelled">Pairing cancelled</string>
+    <string name="hermit_pair_pin_timeout">No PIN was entered on the host within 5 minutes. Tap the PC to pair again.</string>
     <string name="hermit_pair_open_web">Open Shell pairing page</string>
     <string name="hermit_pair_open_web_help">The browser warns about the host\'s self-signed certificate and asks for the Shell web UI password; both are expected.</string>
     <string name="hermit_pair_no_browser">No browser to open the pairing page. Enter the PIN on the host\'s pairing page yourself.</string>

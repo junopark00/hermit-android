@@ -32,11 +32,12 @@ extensions that only Shell provides; they are marked **(Shell)** below.
 - PCs on the local network are found automatically (mDNS). A PC on another network can be added
   with **+** on the PC list (IP address or host name).
 - Tap a PC to pair. The pairing dialog shows the PIN in large digits; enter it on the host's pairing
-  page (in Shell: web UI → Pairing). The dialog closes by itself once pairing succeeds. **Cancel**
-  (or Back) stops waiting and asks the host to drop this device's unfinished pairing, so a PIN
-  entered on the host afterwards no longer pairs it (if the host can't be reached, the attempt stays
-  there until it times out). Each Hermit install pairs under its own ID, so several devices can pair
-  with the same host at once.
+  page (in Shell: web UI → Pairing) within 5 minutes: Shell gives up on a pairing request that gets
+  no PIN after that, and Hermit says so; tap the PC to pair again. The dialog closes by itself once
+  pairing succeeds. **Cancel** (or Back) stops waiting and asks the host to drop this device's
+  unfinished pairing, so a PIN entered on the host afterwards no longer pairs it (if the host can't
+  be reached, the attempt stays there until it times out). Each Hermit install pairs under its own
+  ID, so several devices can pair with the same host at once.
 - **Open Shell pairing page** (shown for open-source hosts, not NVIDIA GameStream) opens the host's
   web UI pairing page in the browser with the PIN and this device's name already filled in; on Shell
   you only confirm. The page is `https://<host>:<web UI port>/pin` (the web UI port is the host's
