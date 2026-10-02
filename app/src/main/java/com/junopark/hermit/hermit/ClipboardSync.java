@@ -356,9 +356,14 @@ public class ClipboardSync {
         }
     }
 
+    // One poll chain: init() also runs from a send (ensureReady) while a poll is waiting, and
+    // its retry must not start a second chain
+    private final Runnable pollTask = this::poll;
+
     private void schedulePoll(int delayMs) {
         if (!stopped) {
-            handler.postDelayed(this::poll, delayMs);
+            handler.removeCallbacks(pollTask);
+            handler.postDelayed(pollTask, delayMs);
         }
     }
 
