@@ -10,6 +10,7 @@ import com.junopark.hermit.binding.video.MediaCodecHelper;
 import com.junopark.hermit.preferences.PreferenceConfiguration;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -52,15 +53,28 @@ public final class AspectPresets {
     /**
      * The presets for this display: heights up to maxHeight (720, 1080, 1440 or 2160, as the
      * caller's capability filters allow), landscape first by height, then any portrait copies.
-     * checkDecoders leaves out sizes the video decoders report they cannot decode (only decoders
-     * that report 720p as supported are trusted, as in the settings screen). Sizes equal to a
-     * standard preset are left out here; the caller skips any other entry it already has.
+     * existing holds the caller's entries ("WIDTHxHEIGHT": standard, native and so on); a preset
+     * of the same height as one of them and within 1% of its width is left out, as is a standard
+     * 16:9 size. checkDecoders leaves out sizes the video decoders report they cannot decode
+     * (only decoders that report 720p as supported are trusted, as in the settings screen).
      */
-    public static List<Preset> forDisplay(Display display, int maxHeight, boolean checkDecoders) {
+    public static List<Preset> forDisplay(Display display, int maxHeight, boolean checkDecoders,
+                                          Collection<String> existing) {
         DisplayMetrics metrics = new DisplayMetrics();
         display.getRealMetrics(metrics);
-        int longSide = Math.max(metrics.widthPixels, metrics.heightPixels);
-        int shortSide = Math.min(metrics.widthPixels, metrics.heightPixels);
+        List<Preset> presets = new ArrayList<>();
+        for (Preset preset : candidates(metrics.widthPixels, metrics.heightPixels, maxHeight, existing)) {
+            if (!checkDecoders || decodable(preset.width, preset.height)) {
+                presets.add(preset);
+            }
+        }
+        return presets;
+    }
+
+    /** forDisplay() without the display and the decoders: plain arithmetic, testable on its own. */
+    static List<Preset> candidates(int screenWidth, int screenHeight, int maxHeight, Collection<String> existing) {
+        int longSide = Math.max(screenWidth, screenHeight);
+        int shortSide = Math.min(screenWidth, screenHeight);
         List<Preset> presets = new ArrayList<>();
         if (shortSide <= 0) {
             return presets;
@@ -69,42 +83,67 @@ public final class AspectPresets {
 
         for (int height : HEIGHTS) {
             if (height <= maxHeight) {
-                add(presets, new Preset(widthFor(height, aspect), height, false), checkDecoders);
+                add(presets, new Preset(widthFor(height, aspect), height, false), existing);
             }
         }
         if (PreferenceConfiguration.isSquarishScreen(longSide, shortSide)) {
             for (int height : PORTRAIT_HEIGHTS) {
                 if (height <= maxHeight) {
-                    add(presets, new Preset(height, widthFor(height, aspect), true), checkDecoders);
+                    add(presets, new Preset(height, widthFor(height, aspect), true), existing);
                 }
             }
         }
         return presets;
     }
 
-    /** height x aspect, even; a multiple of 8 when the ratio stays within 1%. */
+    /**
+     * height x aspect: the exact width when that is (all but) an even number, as at the screen's
+     * own height (1080 x 2340/1080 stays 2340); otherwise a multiple of 8 when the ratio stays
+     * within 1%, else the nearest even number.
+     */
     static int widthFor(int height, double aspect) {
         double exact = height * aspect;
+        long even = Math.round(exact / 2) * 2;
+        if (Math.abs(exact - even) <= 0.01) {
+            return (int) even;
+        }
         int multipleOf8 = (int) Math.round(exact / 8) * 8;
         if (Math.abs((double) multipleOf8 / height - aspect) <= aspect * 0.01) {
             return multipleOf8;
         }
-        return (int) Math.round(exact / 2) * 2;
+        return (int) even;
     }
 
-    private static void add(List<Preset> presets, Preset preset, boolean checkDecoders) {
+    private static void add(List<Preset> presets, Preset preset, Collection<String> existing) {
         if (!PreferenceConfiguration.isNativeResolution(preset.width, preset.height)) {
             return; // a standard preset already (a 16:9 screen)
         }
+        for (String value : existing) {
+            if (nearlySame(preset, value)) {
+                return; // the native size, for example
+            }
+        }
         for (Preset other : presets) {
-            if (other.value.equals(preset.value)) {
+            if (nearlySame(preset, other.value)) {
                 return;
             }
         }
-        if (checkDecoders && !decodable(preset.width, preset.height)) {
-            return;
-        }
         presets.add(preset);
+    }
+
+    /** Same height as "WIDTHxHEIGHT" and a width within 1% of it (2344x1080 next to 2340x1080). */
+    static boolean nearlySame(Preset preset, String value) {
+        int x = value.indexOf('x');
+        if (x <= 0) {
+            return false;
+        }
+        try {
+            int width = Integer.parseInt(value.substring(0, x));
+            int height = Integer.parseInt(value.substring(x + 1));
+            return height == preset.height && Math.abs(width - preset.width) <= width * 0.01;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     /** False only when a trusted decoder exists and no trusted decoder can decode the size. */

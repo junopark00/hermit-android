@@ -545,10 +545,8 @@ public class StreamPanel {
         }
         // Sizes in the screen's aspect ratio (2160 only with 4K): landscape ones by width among
         // the landscape sizes, portrait copies at the end
-        for (AspectPresets.Preset preset : AspectPresets.forDisplay(display, can4k ? 2160 : 1440, true)) {
-            if (resolutionPresets.contains(preset.value)) {
-                continue; // the native size, for example
-            }
+        for (AspectPresets.Preset preset : AspectPresets.forDisplay(display, can4k ? 2160 : 1440, true,
+                new ArrayList<>(resolutionPresets))) {
             resolutionLabels.put(preset.value, preset.label(activity));
             if (preset.portrait) {
                 resolutionPresets.add(preset.value);

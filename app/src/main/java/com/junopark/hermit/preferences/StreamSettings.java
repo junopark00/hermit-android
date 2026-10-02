@@ -217,10 +217,9 @@ public class StreamSettings extends Activity {
             }
 
             int index = insertAt;
-            for (AspectPresets.Preset preset : AspectPresets.forDisplay(display, maxHeight, checkDecoders)) {
-                if (values.contains(preset.value)) {
-                    continue; // the native size, for example
-                }
+            // Not next to an entry of the same height and nearly the same width (the native size)
+            for (AspectPresets.Preset preset : AspectPresets.forDisplay(display, maxHeight, checkDecoders,
+                    new ArrayList<>(values))) {
                 values.add(index, preset.value);
                 entries.add(index, preset.label(getActivity()));
                 index++;
