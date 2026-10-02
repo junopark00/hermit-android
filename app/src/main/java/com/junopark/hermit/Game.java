@@ -594,7 +594,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
             @Override
             public void onRawKeyboard() {
-                // The phone keyboard's keys straight to the host (arrows, Esc, game keys). Shown,
+                // The soft keyboard's keys straight to the host (arrows, Esc, game keys). Shown,
                 // not toggled: on Android 12+ a toggle right after hiding the bar's keyboard
                 // still sees it as shown and hides it.
                 streamView.requestFocus();
@@ -936,7 +936,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             quickMenu.hide();
             return;
         }
-        // Back closes the text input bar (the first Back only hides the phone keyboard)
+        // Back closes the text input bar (the first Back only hides the soft keyboard)
         if (textInput != null && textInput.isShown()) {
             textInput.hide();
             return;
@@ -2567,9 +2567,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         // All fingers up
                         if (event.getEventTime() - threeFingerDownTime < THREE_FINGER_TAP_THRESHOLD) {
                             // This is a 3 finger tap to bring up the keyboard
-                            // Hermit: the text input bar (whole Korean text, Backspace, Enter)
+                            // Hermit: the text input bar (whole Unicode text, Backspace, Enter)
                             if (textInput != null) {
-                                // Like the keyboard button: brings the phone keyboard back
+                                // Like the keyboard button: brings the soft keyboard back
                                 // when Back hid it, else opens or closes the bar
                                 textInput.onKeyboardButton();
                             } else {

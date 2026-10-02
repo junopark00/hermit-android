@@ -132,7 +132,7 @@
     <string name="hermit_text_input_backspace">Backspace (in the field, or on the host when it is empty)</string>
     <string name="hermit_text_input_enter">Send, then Enter</string>
     <string name="hermit_text_input_close">Close the text input</string>
-    <string name="hermit_text_input_raw_keyboard">Phone keyboard straight to the host (arrows, Esc, game keys)</string>
+    <string name="hermit_text_input_raw_keyboard">Send keyboard keys straight to the host (arrows, Esc, game keys)</string>
     <string name="hermit_panel_text_input">Type text…</string>
     <string name="hermit_keyboard_button">Type text on the host</string>
     <string name="hermit_key_shift_enter">Shift+Enter (a new line without sending, in chat apps)</string>
@@ -281,7 +281,7 @@
     <string name="hermit_power_sent">%1$s turns off in a few seconds.</string>
     <string name="hermit_power_restart_sent">%1$s restarts in a few seconds. It shows as online again once it has started.</string>
     <string name="hermit_power_no_permission">This device may not turn the PC off or restart it. In the Shell web UI, open Pairing and allow this device to launch apps.</string>
-    <string name="hermit_power_unsupported">This host can\'t be turned off or restarted remotely. Update Shell on the host PC.</string>
+    <string name="hermit_power_unsupported">This host can\'t be turned off or restarted remotely. This requires a current version of Shell on the host PC.</string>
     <string name="hermit_power_network">Couldn\'t reach the host. Check the network and the PC.</string>
     <string name="hermit_power_close">Close</string>
     <string name="hermit_power_failed">The host could not do it (error %1$d). Try again in a moment.</string>

@@ -2,7 +2,7 @@
 <!-- Hermit: Korean wording and translations that the base strings lack. -->
 <resources>
     <string name="message_decoding_error">이 기기의 영상 디코더와 호환되지 않아 Hermit이 종료되었습니다. 계속 종료되면 스트리밍 설정을 바꿔 보세요.</string>
-    <string name="text_native_res_dialog">네이티브 해상도나 FPS는 스트리밍 서버가 지원하지 않을 수 있습니다. 호스트 PC에 맞는 사용자 지정 디스플레이 모드를 직접 설정해야 할 수 있습니다.\n\nNVIDIA 제어판에서 화면에 맞는 사용자 지정 해상도를 만들 경우, 모니터 손상이나 PC 불안정 등 잠재적인 문제에 대한 NVIDIA의 경고를 읽고 이해했는지 확인하세요.\n\nHermit은 PC에서 사용자 지정 해상도를 만들어 생기는 문제에 책임지지 않습니다.\n\n모니터가 필요한 디스플레이 구성을 지원하지 않으면 가상 모니터를 설정해 볼 수 있습니다. 기기나 호스트 PC가 특정 해상도나 주사율의 스트리밍을 지원하지 않을 수도 있습니다.</string>
+    <string name="text_native_res_dialog">이 기기의 화면에 맞춘 해상도와 프레임 레이트는 호스트가 지원하지 않을 수 있습니다. 호스트에 맞는 디스플레이 모드(가상 디스플레이나 사용자 지정 해상도 등)가 필요할 수 있습니다.\n\nNVIDIA 제어판에서 사용자 지정 해상도를 만들 경우, 모니터 손상이나 PC 불안정 등에 관한 NVIDIA의 경고를 먼저 읽어 보세요. Hermit은 호스트 PC의 사용자 지정 해상도로 생기는 문제에 책임지지 않습니다.\n\n기기나 호스트에 따라 일부 해상도나 주사율로는 스트리밍할 수 없습니다.</string>
     <string name="summary_checkbox_usb_bind_all">Xbox 컨트롤러를 기본 지원하는 경우에도 지원되는 모든 게임패드에 Hermit의 USB 드라이버를 사용합니다</string>
     <string name="summary_language_list">Hermit에서 사용할 언어를 선택합니다</string>
     <string name="local_network_rationale">가까운 호스트와 통신하려면 Hermit에 로컬 네트워크 권한이 필요합니다</string>

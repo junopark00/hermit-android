@@ -132,7 +132,7 @@
     <string name="hermit_text_input_backspace">백스페이스 (입력창에서, 비어 있으면 PC에서)</string>
     <string name="hermit_text_input_enter">보내고 Enter</string>
     <string name="hermit_text_input_close">텍스트 입력 닫기</string>
-    <string name="hermit_text_input_raw_keyboard">폰 키보드로 PC에 바로 입력 (방향키, Esc, 게임 키)</string>
+    <string name="hermit_text_input_raw_keyboard">키보드 입력을 PC로 바로 보내기 (방향키, Esc, 게임 키)</string>
     <string name="hermit_panel_text_input">텍스트 입력…</string>
     <string name="hermit_keyboard_button">PC에 텍스트 입력</string>
     <string name="hermit_key_shift_enter">Shift+Enter (채팅 앱에서 보내지 않고 줄 바꿈)</string>
@@ -160,7 +160,7 @@
     <string name="hermit_quick_quality_low">낮음</string>
     <string name="hermit_quick_quality_note">중간은 이 스트림의 권장 비트레이트입니다. 바로 적용되며, 자동 비트레이트가 켜져 있으면 최대값이 됩니다.</string>
     <string name="hermit_quick_orientation">화면 방향</string>
-    <string name="hermit_quick_keypad_edit">가상 패드 편집</string>
+    <string name="hermit_quick_keypad_edit">키패드 편집</string>
     <string name="hermit_quick_text_input">텍스트 입력</string>
     <string name="hermit_quick_overlay_show">성능 표시 켜기</string>
     <string name="hermit_quick_overlay_hide">성능 표시 끄기</string>
@@ -281,7 +281,7 @@
     <string name="hermit_power_sent">%1$s이(가) 몇 초 뒤 꺼집니다.</string>
     <string name="hermit_power_restart_sent">%1$s이(가) 몇 초 뒤 다시 시작합니다. 부팅이 끝나면 다시 온라인으로 표시됩니다.</string>
     <string name="hermit_power_no_permission">이 기기에는 PC를 끄거나 다시 시작할 권한이 없습니다. Shell 웹 UI의 페어링 페이지에서 이 기기에 앱 실행 권한을 주세요.</string>
-    <string name="hermit_power_unsupported">이 호스트는 원격으로 끄거나 다시 시작할 수 없습니다. 호스트 PC의 Shell을 업데이트하세요.</string>
+    <string name="hermit_power_unsupported">이 호스트는 원격으로 끄거나 다시 시작할 수 없습니다. 호스트 PC에 최신 버전의 Shell이 필요합니다.</string>
     <string name="hermit_power_network">호스트에 연결하지 못했습니다. 네트워크와 PC 상태를 확인하세요.</string>
     <string name="hermit_power_close">닫기</string>
     <string name="hermit_power_failed">호스트가 요청을 처리하지 못했습니다 (오류 %1$d). 잠시 후 다시 시도하세요.</string>

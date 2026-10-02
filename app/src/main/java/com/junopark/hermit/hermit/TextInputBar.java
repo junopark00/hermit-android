@@ -32,11 +32,12 @@ import java.util.List;
 
 /**
  * Text input for the host, like Chrome Remote Desktop's keyboard: type in a field at the top of
- * the screen with the phone keyboard (Korean composition stays on the phone) and send the
- * finished text as Unicode, so it arrives intact whatever the host's input method is.
+ * the screen with the soft keyboard (input method composition, such as Korean syllables, stays
+ * on the device) and send the finished text as Unicode, so it arrives intact whatever the host's
+ * input method is.
  * ⌫ deletes in the field while it has text, otherwise on the host (the keyboard's Backspace on
- * an empty field too); ↵ sends the text, then Enter. ⌨ switches to the phone keyboard sending
- * keys straight to the host (arrows, Esc, game keys). A row of keys and shortcuts the phone
+ * an empty field too); ↵ sends the text, then Enter. ⌨ switches to the soft keyboard sending
+ * keys straight to the host (arrows, Esc, game keys). A row of keys and shortcuts the soft
  * keyboard lacks (Shift+Enter, Esc, Tab, arrows, Ctrl+C/V, Alt+Tab, Ctrl+Alt+Del...) sits under
  * the field; text still in the field is sent before the key.
  */
@@ -49,7 +50,7 @@ public class TextInputBar {
         /** The bar closed: give the focus back to the stream. */
         void onTextInputClosed();
 
-        /** Open the phone keyboard sending keys to the host. */
+        /** Open the soft keyboard sending keys to the host. */
         void onRawKeyboard();
     }
 
@@ -107,13 +108,13 @@ public class TextInputBar {
     // ⌫ ↵ Send ⌨: beside the field, or at the start of the key row when the bar is narrow
     private final View[] actions;
     private boolean compact;
-    // The keyboard button re-showed the open bar (to bring the phone keyboard back)
+    // The keyboard button re-showed the open bar (to bring the soft keyboard back)
     private boolean reshown;
-    // Android 11+: a while after a re-show, whether a phone keyboard came
+    // Android 11+: a while after a re-show, whether a soft keyboard came
     private final Runnable reshownCheck = () -> reshown = isShown() && !imeVisible();
     // Below this width the field would be squeezed by the buttons beside it (a phone in portrait)
     private static final int COMPACT_BELOW_DP = 560;
-    // Between the bar and the phone keyboard (or the screen's bottom edge)
+    // Between the bar and the soft keyboard (or the screen's bottom edge)
     private static final int KEYBOARD_GAP_DP = 4;
     // The window's soft input mode while the bar is closed (restored when it closes)
     private int savedSoftInputMode = -1;
@@ -222,7 +223,7 @@ public class TextInputBar {
         klp.topMargin = dp(6);
         bar.addView(keyScroller, klp);
 
-        // Android 11+: right above the phone keyboard (the stream above stays in view, as in
+        // Android 11+: right above the soft keyboard (the stream above stays in view, as in
         // Chrome Remote Desktop), following it through the window insets. Before that a
         // fullscreen window gets no keyboard insets: at the top, where the keyboard never covers
         // it. The side margins keep it clear of the stream panel handle at either edge.
@@ -244,7 +245,7 @@ public class TextInputBar {
                 v.post(this::arrange);
             }
         });
-        // The phone keyboard came (perhaps slowly): the keyboard button brings it back next time
+        // The soft keyboard came (perhaps slowly): the keyboard button brings it back next time
         bar.setOnApplyWindowInsetsListener((v, insets) -> {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 if (insets.isVisible(WindowInsets.Type.ime())) {
@@ -371,7 +372,7 @@ public class TextInputBar {
     }
 
     /**
-     * The keyboard button: opens the bar; with the bar open, brings the phone keyboard back when
+     * The keyboard button: opens the bar; with the bar open, brings the soft keyboard back when
      * Back hid it, else closes the bar.
      */
     public void onKeyboardButton() {

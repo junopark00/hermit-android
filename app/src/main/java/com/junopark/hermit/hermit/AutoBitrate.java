@@ -2,7 +2,7 @@ package com.junopark.hermit.hermit;
 
 /**
  * Automatic bitrate for streams to a Shell host (live bitrate changes), same rules as Hermit for
- * PC (app/streaming/autobitrate.h). Fed once per second with the last stats window:
+ * Windows (app/streaming/autobitrate.h). Fed once per second with the last stats window:
  * - congestion (more than 2% of frames lost, or the round trip clearly above its usual value)
  *   lowers the bitrate to 80%, at most every 2 s, down to a fifth of the chosen bitrate
  *   (at least 2 Mbps);

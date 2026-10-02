@@ -381,7 +381,7 @@ public class NvHTTP {
         // FIXME: Do we want to use the current port?
         details.localAddress = makeTuple(getXmlString(serverInfo, "LocalIP", false), baseUrlHttp.port());
 
-        // This is missing on recent NVIDIA GameStream versions, but open-source hosts (like Shell) send it
+        // This is missing on recent NVIDIA GameStream versions, but open-source hosts (Sunshine, Apollo, Shell) send it
         details.externalPort = getExternalPort(serverInfo);
         details.remoteAddress = makeTuple(getXmlString(serverInfo, "ExternalIP", false), details.externalPort);
 
@@ -582,7 +582,7 @@ public class NvHTTP {
     }
 
     public int getExternalPort(String serverInfo) {
-        // This is an extension which is not present in NVIDIA GameStream. Open-source hosts (like Shell) send it to be able
+        // This is an extension which is not present in NVIDIA GameStream. Open-source hosts (Sunshine, Apollo, Shell) send it to be able
         // to support dynamic HTTP WAN ports without requiring the user to manually enter the port.
         try {
             return Integer.parseInt(getXmlString(serverInfo, "ExternalPort", true));

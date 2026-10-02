@@ -156,7 +156,7 @@ public class AbsoluteTouchContext implements TouchContext {
         if (mode == Mode.DRAG) {
             conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
         }
-        // Touching a list that still scrolls from a flick only stops it (as on the phone)
+        // Touching a list that still scrolls from a flick only stops it (as in Android lists)
         stoppedFling = flingVelocity != 0;
         stopFling();
         lastX = downX = eventX;

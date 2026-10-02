@@ -4,7 +4,8 @@
 
 Hermit streams your PC's desktop, apps and games to an Android phone, tablet or TV. It is a
 GameStream-protocol client built for remote desktop work as much as for gaming: touch the PC screen
-directly, type in any language, send shortcuts that phones lack, and tune the stream while it runs.
+directly, type in any language, send shortcuts that touch keyboards lack, and tune the stream while
+it runs.
 
 Hermit is the Android client of a small family:
 
@@ -30,7 +31,7 @@ rely on Shell's extensions are marked below.
 - **Direct touch**, in the style of Chrome Remote Desktop: tap to click, drag to scroll, long-press
   and drag to select or move, two-finger tap for a right click.
 - **Trackpad mode** with precise pointer motion and adjustable speed.
-- **Text input bar**: type whole sentences with the phone keyboard, including Korean and other
+- **Text input bar**: type whole sentences with the on-screen keyboard, including Korean and other
   Unicode text, independent of the PC's input language. A shortcut row adds Esc, Tab, arrows,
   Ctrl+C/V/Z, Alt+Tab, Win, Ctrl+Shift+Esc and Ctrl+Alt+Del (Ctrl+Alt+Del needs Shell).
 - **Virtual keypad**: an on-screen joystick or d-pad plus keys you bind yourself, with modifier

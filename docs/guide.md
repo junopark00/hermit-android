@@ -74,27 +74,27 @@ apply immediately from Settings → Input or the stream panel.
 - Tap the zoom tag at the bottom (for example `250%  ✕`), or pinch back to almost 100%, to return to
   normal size. Rotation and picture-in-picture also reset the zoom. The tag avoids the performance
   overlay, the connection warnings and the stream panel handle, sits above the on-screen controls and
-  the keypad, and never sends input to the host. While the phone keyboard is up, the tag moves to the
-  top of the screen.
+  the keypad, and never sends input to the host. While the on-screen keyboard is up, the tag moves to
+  the top of the screen.
 - Turn it off with **Pinch to zoom the picture** in the stream panel or Settings → Input (on by
   default). Requires Android 7.0 or later.
 
 ## Text input bar
 
-Typing whole words and sentences, including Korean and other non-Latin scripts, through the phone
-keyboard.
+Typing whole words and sentences, including Korean and other non-Latin scripts, through the
+on-screen keyboard.
 
 - Open it with the keyboard button under the stream panel handle, a three-finger tap, **Type text…**
   in the stream panel, or the virtual keypad's quick menu.
-- On Android 11 and later the bar sits right above the phone keyboard and slides with it, so the
+- On Android 11 and later the bar sits right above the on-screen keyboard and slides with it, so the
   stream above stays in view. On older versions it opens at the top of the screen.
 - Type in the bar and press **Send** (or the keyboard's send key): the text is typed on the PC as a
-  whole. Composition (for example Korean syllables) happens on the phone and the finished characters
+  whole. Composition (for example Korean syllables) happens on the device and the finished characters
   are sent as Unicode, so the PC's input language does not matter.
 - **⌫** deletes the last character in the bar, or sends Backspace to the PC when the bar is empty (the
   keyboard's own backspace does the same, including keyboards that delete without key events).
-- **↵** sends the text followed by Enter (handy for chats). **⌨** closes the bar and sends the phone
-  keyboard's keys directly again (arrows, Esc, game keys). **✕** closes the bar.
+- **↵** sends the text followed by Enter (handy for chats). **⌨** closes the bar and sends the
+  on-screen keyboard's keys directly again (arrows, Esc, game keys). **✕** closes the bar.
 - The **shortcut row** below the bar (swipe for more): Shift+Enter, Esc, Tab, arrow keys, Del,
   Ctrl+A/C/X/V/Z, Alt+Tab, Win, Ctrl+Shift+Esc (Task Manager) and Ctrl+Alt+Del. Text still in the bar
   is sent first. Long-press a key to see what it does.
@@ -289,7 +289,7 @@ Turn it on in Settings → Advanced, then choose **Performance overlay: metrics 
 
 ## Notices
 
-- Instead of system toasts, Hermit shows its own notice card at the bottom centre (above the phone
+- Instead of system toasts, Hermit shows its own notice card at the bottom centre (above the on-screen
   keyboard and navigation bar). While the text input bar is at the bottom, notices move to the top.
 - One notice is shown at a time; a new one replaces or joins the current one, and touches pass through
   the card. A notice whose screen closes right away is carried over to the next screen. A system toast

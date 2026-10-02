@@ -12,6 +12,9 @@
     <string name="error_404">The host returned an HTTP 404 error. Make sure your PC has a supported GPU. Remote desktop software can also cause this error. Try restarting your PC or reinstalling the host software.</string>
     <string name="summary_checkbox_enable_sops">Allow the host to change game settings for the best streaming</string>
     <string name="summary_checkbox_touchscreen_trackpad">On: the touchscreen moves the pointer like a trackpad. Off: you touch the host screen directly (tap to click, drag to scroll, long press then drag to select or move, two-finger tap for a right click).</string>
+    <string name="pair_pc_ingame">An app is still running on the PC. Quit it before pairing.</string>
+    <string name="applist_menu_quit_and_start">Quit Current App and Start</string>
+    <string name="text_native_res_dialog">Resolutions and frame rates that match this device\'s screen may not be supported by the host. The host may need a matching display mode, such as a virtual display or a custom resolution.\n\nIf you create a custom resolution in the NVIDIA Control Panel, first read NVIDIA\'s warning about possible monitor damage, PC instability and other problems. Hermit is not responsible for problems caused by custom resolutions on the host PC.\n\nSome devices and hosts cannot stream at every resolution or refresh rate.</string>
     <string-array name="language_names" translatable="false">
         <item>@string/hermit_language_default</item>
         <item>English</item>

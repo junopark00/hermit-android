@@ -25,9 +25,9 @@ import com.junopark.hermit.R;
 import java.lang.ref.WeakReference;
 
 /**
- * Short notices in Hermit's style instead of system toasts (which phones draw small, in the
+ * Short notices in Hermit's style instead of system toasts (which many devices draw small, in the
  * system font, at a corner in landscape): a dark card with a teal bar, centred near the bottom
- * of the screen, above the phone keyboard and navigation bar. One at a time; a new one replaces
+ * of the screen, above the soft keyboard and navigation bar. One at a time; a new one replaces
  * the last. Touches pass through it.
  *
  * The card is part of the screen, so it waits while a dialog covers the screen (an error, the
@@ -429,7 +429,7 @@ public final class HermitNotice {
         }, duration);
     }
 
-    // Near the bottom, above the phone keyboard and navigation bar; at the top (below the zoom tag
+    // Near the bottom, above the soft keyboard and navigation bar; at the top (below the zoom tag
     // and a camera cutout) while the keyboard is up or the stream's text input bar takes the
     // bottom. Android 11+; before that a fullscreen window gets no keyboard insets and the bottom
     // margin is enough.
