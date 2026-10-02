@@ -106,6 +106,21 @@ Hermit은 고유한 앱 ID(`io.github.junopark00.hermit`)를 쓰므로 다른 Ga
 스트리밍 중에는 **뒤로 가기**(또는 화면 가장자리의 손잡이)로 스트림 설정 패널을 엽니다. PC 목록의
 **?** 버튼은 [기능 안내서](docs/guide.md)를 엽니다.
 
+## 원격 접속
+
+집 밖에서 스트리밍하려면 [Tailscale](https://tailscale.com)을 권장합니다. 호스트 PC와 이 기기(Google Play)에
+설치하고 같은 tailnet에 로그인한 뒤, **+**를 눌러 PC를 Tailscale 주소(`100.x.y.z`)나 MagicDNS 이름으로
+추가하세요(Tailscale로는 자동 검색이 되지 않습니다). 공유기 설정은 바꿀 필요가 없고, Shell이라면 페어링과
+**Shell 페어링 페이지 열기**도 Tailscale로 그대로 쓸 수 있습니다. Tailscale은 Android의 VPN 자리를 쓰므로 다른
+VPN 앱과 동시에 켤 수 없습니다. 다른 방법으로는 호스트 쪽 공유기의 UPnP나 포트 포워딩이 있으며, 이때는 집에서
+먼저 페어링하세요. 세 가지 방법과 포트 목록은 Shell의
+[원격 접속 안내](https://github.com/junopark00/hermit-shell/blob/main/docs/remote-access.md)(영문)에 있습니다.
+Wake-on-LAN은 대체로 같은 네트워크에서만 동작합니다.
+
+Shell이 처음이라면, Shell 저장소에 호스트 설치부터 페어링, 원격 접속까지 단계별로 안내하는 AI 에이전트용 스킬이
+있습니다. [AI 에이전트와 함께 설정하기](https://github.com/junopark00/hermit-shell/blob/main/README.ko.md#ai-에이전트와-함께-설정하기)를
+참고하세요.
+
 ## 소스에서 빌드
 
 필요한 것:

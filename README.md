@@ -108,6 +108,22 @@ GameStream clients without affecting them.
 While streaming, press **Back** (or tap the handle at the screen edge) for the stream settings panel.
 The **?** button on the PC list opens the [feature guide](docs/guide.md).
 
+## Remote access
+
+To stream from outside your home network, we recommend [Tailscale](https://tailscale.com): install it
+on the host PC and on this device (from Google Play), sign in to the same tailnet, then tap **+** and
+add the PC by its Tailscale address (`100.x.y.z`) or MagicDNS name, because automatic discovery does
+not work across Tailscale. Nothing changes on your router, and with Shell, pairing and **Open Shell
+pairing page** work over Tailscale too. Tailscale uses Android's VPN slot, so it cannot run together
+with another VPN app. The alternatives are UPnP or port forwarding on the host's router; with those,
+pair at home first. See Shell's
+[remote access guide](https://github.com/junopark00/hermit-shell/blob/main/docs/remote-access.md) for
+all three options and the port list. Wake-on-LAN generally works only on the same local network.
+
+New to Shell? Its repository includes an AI agent skill that walks you through installing the host,
+pairing and remote access step by step: see
+[Guided setup with an AI agent](https://github.com/junopark00/hermit-shell#guided-setup-with-an-ai-agent).
+
 ## Building from source
 
 Requirements:
