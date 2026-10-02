@@ -332,9 +332,10 @@ Turn it on in Settings → Advanced, then choose **Performance overlay: metrics 
   found before a device copy was sent is not put over it.
 - When sync could not be set up at stream start (the host was not ready or could not be reached,
   for example) and is set up later, Hermit cannot tell whether the host's clipboard changed in
-  between, so the host's content counts as a change found then: what you copied on the device before
-  is not sent (Android 8.0 and later), and the host's content is put on the device clipboard the next
-  time you leave. Copy again to send yours.
+  between, so the host's content counts as a change made when the last failed attempt to set it up
+  started. What you copied on the device before that is not sent (Android 8.0 and later), and the
+  host's content is put on the device clipboard the next time you leave; copy again to send yours. A
+  device copy made after that attempt is newer and wins.
 - Content already exchanged is not sent again, so Android's "pasted from clipboard" notice appears only
   for new content.
 - The host grants reading its clipboard and setting it separately (in Shell: **Clipboard Read** and

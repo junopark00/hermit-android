@@ -136,6 +136,9 @@ public class ClipboardSync {
     // Whether setup was tried already: only the try at stream start records the host's content
     // as there before the stream (ClipboardChangeOrder.hostSetUp)
     private boolean setupTried;
+    // Wall-clock time the last setup try that failed was started: a later setup dates the host's
+    // content then
+    private long lastFailedSetup;
 
     // Written by the worker, read on the UI thread
     private volatile HostContent pending;
@@ -451,24 +454,26 @@ public class ClipboardSync {
             return;
         }
         // A setup that failed at stream start and succeeds now cannot tell whether the host's
-        // clipboard changed in between: what it finds is a host change found now, so a device
-        // clip from before it (waiting in deferredPush) does not overwrite it, and the next poll
-        // fetches it. When the host did not change after all, its content wins over that clip
-        // (copy it again to send it), which is better than overwriting a copy made on the host.
+        // clipboard changed in between: what it finds is a host change made when the last try
+        // failed, so a device clip copied before that (waiting in deferredPush) does not
+        // overwrite it, a device copy made after it still wins, and the next poll fetches the
+        // host content while no such copy came. When the host did not change after all, its
+        // content wins over the older clip (copy it again to send it), which is better than
+        // overwriting a copy made on the host.
         boolean atStart = !setupTried;
         setupTried = true;
         if (!atStart) {
             HermitLog.info("Clipboard sync: setting up again after it failed at stream start");
         }
+        long attempt = System.currentTimeMillis();
         try {
-            long requested = System.currentTimeMillis();
             String info = new String(http.hermitGetClipboard("info", 4096), StandardCharsets.UTF_8);
             long seq = parseLong(info, "seq");
             if (seq >= 0) {
                 // Shell: remember the current host state but do not copy it (at stream start);
                 // only changes made during the stream come back to the device.
                 mode = Mode.EXTENDED;
-                order.hostSetUp(seqKey(seq), atStart, requested);
+                order.hostSetUp(seqKey(seq), atStart, lastFailedSetup);
                 HermitLog.info("Clipboard sync: host supports text and images");
                 schedulePoll(EXTENDED_POLL_MS);
                 runDeferredPush();
@@ -491,25 +496,26 @@ public class ClipboardSync {
             }
             if (e.getErrorCode() != 400) {
                 // e.g. 403 before the host registered the stream: try again later
+                lastFailedSetup = attempt;
                 schedulePoll(LEGACY_POLL_MS);
                 return;
             }
             mode = Mode.LEGACY;
         } catch (IOException e) {
             HermitLog.warning("Clipboard sync setup failed: " + e);
+            lastFailedSetup = attempt;
             schedulePoll(LEGACY_POLL_MS);
             return;
         }
 
         HermitLog.info("Clipboard sync: host supports text only");
-        long requested = System.currentTimeMillis();
         try {
             byte[] text = http.hermitGetClipboard("text", MAX_TEXT_BYTES);
-            order.hostSetUp(textKey(new String(text, StandardCharsets.UTF_8)), atStart, requested);
+            order.hostSetUp(textKey(new String(text, StandardCharsets.UTF_8)), atStart, lastFailedSetup);
         } catch (HostHttpResponseException e) {
             if (e.getErrorCode() == 413) {
                 // At stream start: there before the stream, nothing to say
-                order.hostSetUp(LEGACY_TOO_LARGE, atStart, requested);
+                order.hostSetUp(LEGACY_TOO_LARGE, atStart, lastFailedSetup);
             } else {
                 handleReadError(e);
             }

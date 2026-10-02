@@ -15,7 +15,7 @@ package com.junopark.hermit.hermit;
  *   was made, or as long as a transfer in progress (a poll waits behind it on the worker);
  * - a device clip sent to the host takes the time of its clip timestamp;
  * - host content found when sync is set up is not a change only at stream start; a setup that
- *   succeeds later takes it for a host change found then (hostSetUp).
+ *   succeeds later takes it for a host change made when the last setup try failed (hostSetUp).
  *
  * So:
  * - a device clip is sent only while no host change was found after it (deviceMayReplaceHost);
@@ -54,23 +54,24 @@ final class ClipboardChangeOrder {
     }
 
     /**
-     * Sync was set up and found host content key with a request issued at time now. Only the
-     * setup at stream start records it as the host's content before the stream (hostRecorded). A
-     * setup that failed then and succeeds later cannot tell whether the host's clipboard changed
-     * in between (the user copied there during the stream), so the content is a host change found
-     * now: an older device clip (waiting to be sent since stream start) no longer replaces it, and
-     * the next poll fetches it while no newer device copy came. The trade-off: when the host did
-     * not change after all, its older content wins over that device clip, which is then not sent
-     * (copy it again).
+     * Sync was set up and found host content key. Only the setup at stream start records it as
+     * the host's content before the stream (hostRecorded). A setup that failed then and succeeds
+     * later cannot tell whether the host's clipboard changed in between (the user copied there
+     * during the stream), so the content is a host change made at lastFailedSetup, when the last
+     * setup try that failed was started: a device clip copied before that (waiting to be sent
+     * since) no longer replaces it, a device copy made after it does, and the next poll fetches
+     * the host content while no such device copy came. The trade-off: when the host did not
+     * change after all, its older content wins over that older device clip, which is then not
+     * sent (copy it again).
      */
-    void hostSetUp(String key, boolean atStart, long now) {
+    void hostSetUp(String key, boolean atStart, long lastFailedSetup) {
         if (atStart) {
             hostRecorded(key);
             return;
         }
         hostKnown = true;
         hostKey = key;
-        hostTime = Math.max(hostTime, now);
+        hostTime = Math.max(hostTime, lastFailedSetup);
         hostPending = true;
     }
 
