@@ -181,7 +181,17 @@ public class PairingManager {
     public X509Certificate getPairedCert() {
         return serverCert;
     }
-    
+
+    // Best-effort cleanup after a failed pairing step. Older hosts have no /unpair
+    // route and answer 404, so a failure here must never replace the pairing result.
+    private void cancelPairing() {
+        try {
+            http.unpair();
+        } catch (IOException e) {
+            HermitLog.warning("Pairing cleanup failed: "+e.getMessage());
+        }
+    }
+
     public PairState pair(String serverInfo, String pin) throws IOException, XmlPullParserException {
         PairingHashAlgorithm hashAlgo;
 
@@ -216,7 +226,7 @@ public class PairingManager {
         if (serverCert == null) {
             // Attempting to pair while another device is pairing will cause the host
             // to give an empty cert in the response.
-            http.unpair();
+            cancelPairing();
             return PairState.ALREADY_IN_PROGRESS;
         }
 
@@ -230,7 +240,7 @@ public class PairingManager {
         // Send the encrypted challenge to the server
         String challengeResp = http.executePairingCommand("clientchallenge="+bytesToHex(encryptedChallenge), true);
         if (!NvHTTP.getXmlString(challengeResp, "paired", true).equals("1")) {
-            http.unpair();
+            cancelPairing();
             return PairState.FAILED;
         }
         
@@ -247,7 +257,7 @@ public class PairingManager {
         byte[] challengeRespEncrypted = encryptAes(challengeRespHash, aesKey);
         String secretResp = http.executePairingCommand("serverchallengeresp="+bytesToHex(challengeRespEncrypted), true);
         if (!NvHTTP.getXmlString(secretResp, "paired", true).equals("1")) {
-            http.unpair();
+            cancelPairing();
             return PairState.FAILED;
         }
         
@@ -259,7 +269,7 @@ public class PairingManager {
         // Ensure the authenticity of the data
         if (!verifySignature(serverSecret, serverSignature, serverCert)) {
             // Cancel the pairing process
-            http.unpair();
+            cancelPairing();
             
             // Looks like a MITM
             return PairState.FAILED;
@@ -269,7 +279,7 @@ public class PairingManager {
         byte[] serverChallengeRespHash = hashAlgo.hashData(concatBytes(concatBytes(randomChallenge, serverCert.getSignature()), serverSecret));
         if (!Arrays.equals(serverChallengeRespHash, serverResponse)) {
             // Cancel the pairing process
-            http.unpair();
+            cancelPairing();
             
             // Probably got the wrong PIN
             return PairState.PIN_WRONG;
@@ -279,14 +289,14 @@ public class PairingManager {
         byte[] clientPairingSecret = concatBytes(clientSecret, signData(clientSecret, pk));
         String clientSecretResp = http.executePairingCommand("clientpairingsecret="+bytesToHex(clientPairingSecret), true);
         if (!NvHTTP.getXmlString(clientSecretResp, "paired", true).equals("1")) {
-            http.unpair();
+            cancelPairing();
             return PairState.FAILED;
         }
         
         // Do the initial challenge (seems necessary for us to show as paired)
         String pairChallenge = http.executePairingChallenge();
         if (!NvHTTP.getXmlString(pairChallenge, "paired", true).equals("1")) {
-            http.unpair();
+            cancelPairing();
             return PairState.FAILED;
         }
 
