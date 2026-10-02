@@ -3,8 +3,8 @@ package com.junopark.hermit.hermit;
 import android.app.Application;
 
 /**
- * Registered by the nonRoot manifest: installs the crash reporter before any activity starts,
- * and lets notices follow the screen that shows.
+ * Registered by the main manifest (both flavours): installs the crash reporter before any
+ * activity starts, and lets notices follow the screen that shows.
  */
 public class HermitApplication extends Application {
     @Override

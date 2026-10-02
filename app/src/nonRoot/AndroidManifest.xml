@@ -1,29 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Non-root application name -->
     <!-- FIXME: We should set extractNativeLibs=false but this breaks installation on the Fire TV 3 -->
-    <!-- Hermit: HermitApplication installs the crash reporter. -->
+    <!-- Hermit: the application class, the clipboard image provider and the translated screen
+         names are in the main manifest, shared with the root flavour. -->
     <application
-        android:name="com.junopark.hermit.hermit.HermitApplication"
-        android:label="@string/app_label">
-
-        <!-- Hermit: serves host clipboard images put on the device clipboard (see ClipboardSync) -->
-        <provider
-            android:name="com.junopark.hermit.hermit.ClipboardImageProvider"
-            android:authorities="${applicationId}.clipboard"
-            android:exported="false"
-            android:grantUriPermissions="true" />
-
-        <!-- Hermit: translated screen names (upstream hard-codes them in English) -->
-        <activity
-            android:name="com.junopark.hermit.preferences.StreamSettings"
-            android:label="@string/hermit_label_stream_settings"
-            tools:replace="android:label" />
-        <activity
-            android:name="com.junopark.hermit.preferences.AddComputerManually"
-            android:label="@string/hermit_label_add_computer"
-            tools:replace="android:label" />
-    </application>
+        android:label="@string/app_label" />
 </manifest>
