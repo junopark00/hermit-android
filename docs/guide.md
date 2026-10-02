@@ -318,10 +318,16 @@ Turn it on in Settings → Advanced, then choose **Performance overlay: metrics 
 - Android only lets the visible app read the clipboard, and leaving the app ends the stream. Hermit
   therefore checks the host clipboard's change counter once a second while streaming, fetches changes
   ahead of time and puts them on the device clipboard the moment you leave.
-- The newer copy wins: host content fetched (or still waiting to be fetched again) before you return
-  to the stream with something newly copied on the device is not put over that device copy when you
-  leave, even if the device copy could not be sent (on Android 7 and earlier, only once it was sent).
-  Host content copied after your return still comes back.
+- The most recent change wins. A host change counts from the moment Hermit first finds it (up to about
+  a second after it was made), a device copy from the time Android stamps on it (Android 8.0 and
+  later). When you return to the stream, a device copy is sent only if the host clipboard has not
+  changed since you made it; otherwise it is not sent (now or later) and the host's newer content is
+  put on the device clipboard the next time you leave. When you leave, host content is put on the
+  device clipboard only if it changed after your latest device copy, even if that copy could not be
+  sent, and host content still waiting to be fetched again is dropped once a newer device copy was
+  seen. Host content Hermit itself put on the device clipboard does not count as a device copy. On
+  Android 7 and earlier, which has no copy times, a device copy is always sent, and host content
+  found before a device copy was sent is not put over it.
 - Content already exchanged is not sent again, so Android's "pasted from clipboard" notice appears only
   for new content.
 - The host grants reading its clipboard and setting it separately (in Shell: **Clipboard Read** and
