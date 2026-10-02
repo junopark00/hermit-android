@@ -233,7 +233,15 @@ public class ClipboardSync {
             if (key.equals(inFlightKey)) {
                 return; // still being sent
             }
-            final String mime = appContext.getContentResolver().getType(uri);
+            String type;
+            try {
+                type = appContext.getContentResolver().getType(uri);
+            } catch (RuntimeException e) {
+                // A faulty content provider; the image is converted whatever its type
+                HermitLog.warning("Clipboard image type could not be read: " + e);
+                type = null;
+            }
+            final String mime = type;
             inFlightKey = key;
             handler.post(() -> pushImage(uri, mime, key, timestamp));
             return;
@@ -241,7 +249,12 @@ public class ClipboardSync {
 
         CharSequence text = item.getText();
         if (text == null && uri == null) {
-            text = item.coerceToText(appContext);
+            try {
+                text = item.coerceToText(appContext);
+            } catch (RuntimeException e) {
+                HermitLog.warning("Clipboard text could not be read: " + e);
+                text = null;
+            }
         }
         if (text == null || text.length() == 0) {
             if (uri != null) {
@@ -713,7 +726,8 @@ public class ClipboardSync {
         byte[] png;
         try {
             png = readAsPng(appContext.getContentResolver(), uri, mime);
-        } catch (IOException | SecurityException e) {
+        } catch (IOException | RuntimeException e) {
+            // RuntimeException: a SecurityException, or whatever a faulty content provider throws
             HermitLog.warning("Clipboard image could not be read: " + e);
             reportSendFailure(key, R.string.hermit_clipboard_image_unreadable);
             markRefused(key, timestamp);
