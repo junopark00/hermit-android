@@ -66,7 +66,12 @@ import okhttp3.ResponseBody;
 
 
 public class NvHTTP {
+    // GameStream's shared client ID, sent on everything but pairing (see the constructor)
+    private static final String SHARED_UNIQUE_ID = "0123456789ABCDEF";
+
     private String uniqueId;
+    // Hermit: this install's own ID, sent on the pairing requests only (/pair and /unpair)
+    private String pairingUniqueId;
     private PairingManager pm;
 
     private static final int DEFAULT_HTTPS_PORT = 47984;
@@ -208,7 +213,10 @@ public class NvHTTP {
     public NvHTTP(ComputerDetails.AddressTuple address, int httpsPort, String uniqueId, X509Certificate serverCert, ClientCryptoProvider cryptoProvider) throws IOException {
         // Use the same UID as other GameStream clients so we can quit games
         // started by them.
-        this.uniqueId = "0123456789ABCDEF";
+        this.uniqueId = SHARED_UNIQUE_ID;
+        // Hermit: the host keys an unfinished pairing by this ID; with the shared one, two devices
+        // pairing at once would replace each other's attempt, and one's cleanup would drop the other's
+        this.pairingUniqueId = uniqueId != null && !uniqueId.isEmpty() ? uniqueId : SHARED_UNIQUE_ID;
 
         this.serverCert = serverCert;
 
@@ -417,10 +425,11 @@ public class NvHTTP {
     }
 
     private HttpUrl getCompleteUrl(HttpUrl baseUrl, String path, String query) {
+        boolean pairing = path.equals("pair") || path.equals("unpair");
         return baseUrl.newBuilder()
                 .addPathSegment(path)
                 .query(query)
-                .addQueryParameter("uniqueid", uniqueId)
+                .addQueryParameter("uniqueid", pairing ? pairingUniqueId : uniqueId)
                 .addQueryParameter("uuid", UUID.randomUUID().toString())
                 .build();
     }
