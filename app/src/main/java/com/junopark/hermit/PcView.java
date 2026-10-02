@@ -81,6 +81,9 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     // The pairing attempt the dialog belongs to; a cancelled attempt that ends late leaves a
     // newer attempt's dialog and polling alone
     private Object pairingAttempt;
+    // A PC paired while this activity was in the background (the Shell pairing page in the
+    // browser): its app list opens from onResume(), since a background launch is blocked
+    private ComputerDetails pendingAppList;
     private final ServiceConnection serviceConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder binder) {
             final ComputerManagerService.ComputerManagerBinder localBinder =
@@ -331,6 +334,12 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
 
         inForeground = true;
         startComputerUpdates();
+
+        if (pendingAppList != null) {
+            ComputerDetails computer = pendingAppList;
+            pendingAppList = null;
+            doAppList(computer, true, false);
+        }
     }
 
     @Override
@@ -517,7 +526,14 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                             HermitNotice.show(PcView.this, toastMessage, HermitNotice.LONG);
                         }
 
-                        if (toastSuccess) {
+                        if (toastSuccess && !inForeground) {
+                            // Paired from the browser (Shell pairing page): Android blocks an
+                            // activity launch from the background, so the app list opens when
+                            // the user comes back
+                            pendingAppList = computer;
+                            startComputerUpdates();
+                        }
+                        else if (toastSuccess) {
                             // Open the app list after a successful pairing attempt
                             doAppList(computer, true, false);
                         }
