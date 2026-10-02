@@ -81,6 +81,13 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     // The pairing attempt the dialog belongs to; a cancelled attempt that ends late leaves a
     // newer attempt's dialog and polling alone
     private Object pairingAttempt;
+    // Counts this device's pairing attempts, so withdrawing a cancelled one can tell that a newer
+    // one has replaced it on the host (static: a recreated activity may start the next attempt)
+    private static final java.util.concurrent.atomic.AtomicInteger pairingGeneration =
+            new java.util.concurrent.atomic.AtomicInteger();
+    // Held while a cancelled attempt is withdrawn; a newer attempt takes it before it asks the host
+    // to pair, so the withdrawal (same uniqueid) can't reach the host after it and drop it
+    private static final Object pairingWithdrawLock = new Object();
     // A PC paired while this activity was in the background (the Shell pairing page in the
     // browser): its app list opens from onResume(), since a background launch is blocked
     private ComputerDetails pendingAppList;
@@ -431,6 +438,8 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
         // Hermit: no "Pairing" toast; the PIN dialog shows that pairing is under way
         final java.util.concurrent.atomic.AtomicBoolean cancelled = new java.util.concurrent.atomic.AtomicBoolean();
         final Object attempt = new Object();
+        final int generation = pairingGeneration.incrementAndGet();
+        final String uniqueId = managerBinder.getUniqueId();
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -442,7 +451,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                     stopComputerUpdates(true);
 
                     httpConn = new NvHTTP(ServerHelper.getCurrentAddressFromComputer(computer),
-                            computer.httpsPort, managerBinder.getUniqueId(), computer.serverCert,
+                            computer.httpsPort, uniqueId, computer.serverCert,
                             PlatformBinding.getCryptoProvider(PcView.this));
                     if (httpConn.getPairState() == PairState.PAIRED) {
                         // Don't display any toast, but open the app list
@@ -456,10 +465,17 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                         // Hermit: a PIN dialog that stays up until pairing ends; Cancel aborts it
                         runOnUiThread(() -> showPairingDialog(computer, pinStr, attempt, () -> {
                             cancelled.set(true);
-                            new Thread(pairingConn::cancelPendingRequests).start();
+                            new Thread(() -> {
+                                pairingConn.cancelPendingRequests();
+                                withdrawPairing(computer, uniqueId, generation);
+                            }).start();
                         }));
 
                         PairingManager pm = httpConn.getPairingManager();
+
+                        synchronized (pairingWithdrawLock) {
+                            // Waits for an earlier, cancelled attempt's withdrawal to be sent
+                        }
 
                         PairState pairState = pm.pair(httpConn.getServerInfo(true), pinStr);
                         if (pairState == PairState.PIN_WRONG) {
@@ -545,6 +561,25 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 });
             }
         }).start();
+    }
+
+    // Hermit: aborting the request leaves the attempt waiting on the host, which could still give
+    // it a PIN entered in the web UI: /unpair with this device's ID drops it. Best effort, off the
+    // UI thread; skipped once a newer attempt from this device has replaced it on the host.
+    private void withdrawPairing(ComputerDetails computer, String uniqueId, int generation) {
+        synchronized (pairingWithdrawLock) {
+            if (pairingGeneration.get() != generation) {
+                return;
+            }
+            try {
+                // A fresh connection: the cancelled one fails every request at once
+                new NvHTTP(ServerHelper.getCurrentAddressFromComputer(computer), computer.httpsPort,
+                        uniqueId, computer.serverCert, PlatformBinding.getCryptoProvider(PcView.this))
+                        .withdrawPairing();
+            } catch (IOException e) {
+                HermitLog.warning("Withdrawing the cancelled pairing failed: "+e.getMessage());
+            }
+        }
     }
 
     // Hermit: the PIN large on its own line, the Shell hint, a button that opens the host's web UI

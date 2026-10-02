@@ -748,6 +748,17 @@ public class NvHTTP {
     public void unpair() throws IOException {
         openHttpConnectionToString(httpClientLongConnectTimeout, baseUrlHttp, "unpair");
     }
+
+    /**
+     * Hermit: asks the host to drop this device's unfinished pairing after the user cancelled it.
+     * Short timeouts: it is sent on a fresh connection, best effort, and a newer attempt waits for it.
+     */
+    public void withdrawPairing() throws IOException {
+        openHttpConnectionToString(httpClientShortConnectTimeout.newBuilder()
+                        .readTimeout(SHORT_CONNECTION_TIMEOUT, TimeUnit.MILLISECONDS)
+                        .build(),
+                baseUrlHttp, "unpair");
+    }
     
     public InputStream getBoxArt(NvApp app) throws IOException {
         ResponseBody resp = openHttpConnection(httpClientLongConnectTimeout, getHttpsUrl(true), "appasset", "appid=" + app.getAppId() + "&AssetType=2&AssetIdx=0");
