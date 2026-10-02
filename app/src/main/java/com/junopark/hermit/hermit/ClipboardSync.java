@@ -41,7 +41,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Android only lets the focused app read the clipboard, and the stream stops as soon as the
  * activity is no longer visible, so the host side is polled while streaming (Shell: a cheap
  * sequence number check) and the latest host content is kept ready to be applied the moment
- * focus is lost, without any network I/O at that point.
+ * focus is lost, without any network I/O at that point. Host content the user has since replaced
+ * by copying something on the device is not applied.
  *
  * Text works with any host that has the clipboard endpoint; images need Shell's type=info/image extensions.
  * Files are not synced in either direction (a notice says so once per stream).
@@ -99,6 +100,9 @@ public class ClipboardSync {
     // device clipboard alone once nothing can be sent)
     private volatile Mode mode = Mode.UNKNOWN;
     private long hostSeq = -1;
+    // The newest host clipboard item (seq) a poll found; differs from hostSeq while that item is
+    // still to be fetched again (after a busy host or a failed fetch)
+    private long noticedHostSeq = -1;
     private String legacyHostTextKey;
     // The host refused reading (GET) or setting (POST) its clipboard for this device (401):
     // polling stops, or sending does, for the rest of the stream
@@ -126,7 +130,7 @@ public class ClipboardSync {
     // after the stream started); sent once setup succeeds.
     private Runnable deferredPush;
 
-    // Written by the worker, read on the UI thread
+    // Written by the worker, read on the UI thread (which also drops it for a newer device copy)
     private volatile HostContent pending;
     private final AtomicBoolean filesNoticeShown = new AtomicBoolean();
 
@@ -143,6 +147,9 @@ public class ClipboardSync {
     // The device clip queued for sending and not yet sent or given up on (a slow image upload,
     // or waiting for the host to accept clipboard calls): not queued again on another return
     private String inFlightKey;
+    // The device clip deviceCopied() last ran for, so a clip that is not sent is not taken again
+    // for a newer copy on each return
+    private long copiedClipTimestamp = -1;
 
     public ClipboardSync(Activity activity, NvHTTP http) {
         this.activity = activity;
@@ -185,11 +192,6 @@ public class ClipboardSync {
         if (stopped || handler == null) {
             return;
         }
-        if (writeDenied || mode == Mode.DISABLED) {
-            // Nothing can be sent for the rest of the stream: do not read the clipboard (Android
-            // 12+ shows a "pasted from clipboard" notice for every read) on each return
-            return;
-        }
         ClipboardManager cm = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
         if (cm == null) {
             return;
@@ -202,6 +204,16 @@ public class ClipboardSync {
             return;
         }
         long timestamp = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ? description.getTimestamp() : -1;
+        if (timestamp > 0 && timestamp != lastSeenClipTimestamp && timestamp != copiedClipTimestamp) {
+            // Not the host content we put there (that one was seen): the user copied something
+            // on the device, whether it can be sent or not
+            deviceCopied(timestamp);
+        }
+        if (writeDenied || mode == Mode.DISABLED) {
+            // Nothing can be sent for the rest of the stream: do not read the clipboard (Android
+            // 12+ shows a "pasted from clipboard" notice for every read) on each return
+            return;
+        }
         if (timestamp > 0 && (timestamp == lastSeenClipTimestamp || timestamp == hostRefusedClipTimestamp)) {
             return;
         }
@@ -282,6 +294,21 @@ public class ClipboardSync {
         }
         inFlightKey = key;
         handler.post(() -> pushText(value, key, timestamp));
+    }
+
+    /**
+     * The user copied something on the device since the stream last had focus (only known where
+     * Android has clip timestamps, 8.0+). That copy is newer than host content fetched before, or
+     * still to be fetched again: it is dropped, so leaving the stream does not put it over the
+     * device copy, whether that copy can be sent or not. Host content that changes after the
+     * return still comes back.
+     */
+    private void deviceCopied(long timestamp) {
+        copiedClipTimestamp = timestamp;
+        pending = null;
+        // Ahead of polls waiting in the queue, which may already find host changes made after
+        // the return; a poll running now found what the host had before it
+        handler.postAtFrontOfQueue(this::hostContentSuperseded);
     }
 
     /** Worker thread: a device clip reached the host. */
@@ -382,6 +409,17 @@ public class ClipboardSync {
     }
 
     // ---- Worker thread -------------------------------------------------------------------
+
+    /** Worker thread: see deviceCopied(). */
+    private void hostContentSuperseded() {
+        pending = null; // fetched by a poll that was running at the return
+        if (mode == Mode.EXTENDED && noticedHostSeq >= 0 && noticedHostSeq != hostSeq) {
+            // The host item still to be fetched again is older than the device copy: recorded as
+            // seen, so only host content that changes after it is fetched
+            hostSeq = noticedHostSeq;
+            HermitLog.info("Clipboard: host content not fetched again: newer content was copied on the device");
+        }
+    }
 
     private void init() {
         if (stopped) {
@@ -497,6 +535,7 @@ public class ClipboardSync {
         if (seq < 0 || seq == hostSeq) {
             return;
         }
+        noticedHostSeq = seq;
         String type = parseField(info, "type");
 
         // The host clipboard changed: whatever was fetched before is no longer what the user
@@ -696,7 +735,7 @@ public class ClipboardSync {
         }
         try {
             String reply = http.hermitSetClipboard("text", data, "text/plain; charset=utf-8");
-            recordHostSeq(reply);
+            recordSent(reply);
             legacyHostTextKey = key;
             markSent(key, timestamp);
             toast(R.string.hermit_clipboard_sent_text, HermitNotice.SHORT);
@@ -764,7 +803,7 @@ public class ClipboardSync {
         }
         try {
             String reply = http.hermitSetClipboard("image", png, "image/png");
-            recordHostSeq(reply);
+            recordSent(reply);
             modeAssumed = false;
             markSent(key, timestamp);
             toast(R.string.hermit_clipboard_sent_image, HermitNotice.SHORT);
@@ -887,11 +926,16 @@ public class ClipboardSync {
         toast(messageRes, HermitNotice.LONG);
     }
 
-    private void recordHostSeq(String reply) {
+    /** A device clip reached the host: what the host had before is older. */
+    private void recordSent(String reply) {
         long seq = parseLong(reply, "seq");
         if (seq >= 0) {
             hostSeq = seq; // our own write: do not fetch it back
         }
+        noticedHostSeq = hostSeq;
+        // Host content fetched by an earlier poll (the worker runs one thing at a time) is not
+        // put over the device copy at the next focus loss
+        pending = null;
     }
 
     private void toast(int messageRes, int length) {

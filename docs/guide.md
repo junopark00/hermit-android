@@ -300,6 +300,7 @@ Turn it on in Settings → Advanced, then choose **Performance overlay: metrics 
 - **Files are not synced** in either direction: copying a file on the device or on the host shows a
   notice once per stream, and an older text or image is not pasted in its place. Only text and images
   are synced.
+- A send waits up to 5 minutes for the host's reply (a large image can take the host a while to set).
 - Content that could not be sent (a network error, a host that is not ready yet, or a host clipboard
   that was busy) is retried the next time you return to the stream, with a notice once per item.
   Content that can never be sent (too large, unreadable) is not retried until you copy something
@@ -317,6 +318,10 @@ Turn it on in Settings → Advanced, then choose **Performance overlay: metrics 
 - Android only lets the visible app read the clipboard, and leaving the app ends the stream. Hermit
   therefore checks the host clipboard's change counter once a second while streaming, fetches changes
   ahead of time and puts them on the device clipboard the moment you leave.
+- The newer copy wins: host content fetched (or still waiting to be fetched again) before you return
+  to the stream with something newly copied on the device is not put over that device copy when you
+  leave, even if the device copy could not be sent (on Android 7 and earlier, only once it was sent).
+  Host content copied after your return still comes back.
 - Content already exchanged is not sent again, so Android's "pasted from clipboard" notice appears only
   for new content.
 - The host grants reading its clipboard and setting it separately (in Shell: **Clipboard Read** and
