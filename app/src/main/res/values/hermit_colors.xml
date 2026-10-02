@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hermit theme tokens: IBM Carbon grey layers with a single teal accent (same as Hermit for Windows). -->
+<resources>
+    <color name="hermit_background">#161616</color>
+    <color name="hermit_layer1">#262626</color>
+    <color name="hermit_layer2">#393939</color>
+    <color name="hermit_border_strong">#6F6F6F</color>
+    <color name="hermit_text_primary">#F4F4F4</color>
+    <color name="hermit_text_secondary">#C6C6C6</color>
+    <color name="hermit_text_helper">#A8A8A8</color>
+    <color name="hermit_accent">#08BDBA</color>
+    <color name="hermit_accent_fill">#007D79</color>
+    <color name="hermit_success">#42BE65</color>
+    <color name="hermit_warning">#F1C21B</color>
+    <color name="hermit_danger">#FA4D56</color>
+    <color name="hermit_overlay_panel">#E6161616</color>
+</resources>

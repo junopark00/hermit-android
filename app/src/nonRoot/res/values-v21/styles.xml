@@ -1,0 +1,30 @@
+<resources>
+
+    <!--
+        Hermit theme (overrides the upstream AppBaseTheme for API 21+): Carbon grey layers,
+        one teal accent. See docs/guide.md (Appearance and languages).
+    -->
+    <style name="AppBaseTheme" parent="android:Theme.Material">
+        <item name="android:statusBarColor">@color/hermit_background</item>
+        <item name="android:navigationBarColor">@color/hermit_background</item>
+        <item name="android:colorPrimary">@color/hermit_layer1</item>
+        <item name="android:colorPrimaryDark">@color/hermit_background</item>
+        <item name="android:colorAccent">@color/hermit_accent</item>
+        <item name="android:colorControlActivated">@color/hermit_accent</item>
+        <item name="android:colorControlNormal">@color/hermit_text_helper</item>
+        <item name="android:colorButtonNormal">@color/hermit_layer2</item>
+        <item name="android:colorBackground">@color/hermit_background</item>
+        <item name="android:windowBackground">@color/hermit_background</item>
+        <item name="android:textColorPrimary">@color/hermit_text_primary</item>
+        <item name="android:textColorSecondary">@color/hermit_text_secondary</item>
+        <item name="android:alertDialogTheme">@style/HermitAlertDialog</item>
+    </style>
+
+    <style name="HermitAlertDialog" parent="android:Theme.Material.Dialog.Alert">
+        <item name="android:colorBackground">@color/hermit_layer1</item>
+        <item name="android:colorAccent">@color/hermit_accent</item>
+        <item name="android:textColorPrimary">@color/hermit_text_primary</item>
+        <item name="android:textColorSecondary">@color/hermit_text_secondary</item>
+    </style>
+
+</resources>

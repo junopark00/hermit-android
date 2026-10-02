@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stream panel handle on the left edge: a 22x56dp bar rounded on the inner (right) side, in a
+     48x64dp touch area that is transparent towards the stream. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:right="26dp" android:top="4dp" android:bottom="4dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/hermit_layer1" />
+            <stroke android:width="1dp" android:color="@color/hermit_border_strong" />
+            <corners android:topRightRadius="4dp" android:bottomRightRadius="4dp" />
+        </shape>
+    </item>
+</layer-list>

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hermit: "Add PC manually" screen (overrides upstream activity_add_computer_manually) with the
+     same 56dp top bar as the PC list. View ids are the ones AddComputerManually uses. -->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/hermit_background"
+    tools:context="com.junopark.hermit.preferences.AddComputerManually">
+
+    <LinearLayout
+        android:id="@+id/hermitAddPcTopBar"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_alignParentTop="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
+
+        <TextView
+            android:id="@+id/manuallyAddPcText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:preferKeepClear="true"
+            android:text="@string/title_add_pc"
+            android:textColor="@color/hermit_text_primary"
+            android:textSize="20sp" />
+    </LinearLayout>
+
+    <View
+        android:id="@+id/hermitAddPcTopBarDivider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_below="@id/hermitAddPcTopBar"
+        android:background="@color/hermit_layer2" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/hermitAddPcTopBarDivider"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingTop="16dp"
+        android:paddingEnd="16dp">
+
+        <EditText
+            android:id="@+id/hostTextView"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="@string/ip_hint"
+            android:inputType="textNoSuggestions"
+            android:minHeight="48dp"
+            android:preferKeepClear="true"
+            android:singleLine="true">
+
+            <requestFocus />
+        </EditText>
+
+        <Button
+            android:id="@+id/addPcButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:backgroundTint="@color/hermit_accent_fill"
+            android:minHeight="48dp"
+            android:preferKeepClear="true"
+            android:text="@string/hermit_add_pc_button"
+            android:textColor="@color/hermit_text_primary" />
+    </LinearLayout>
+</RelativeLayout>

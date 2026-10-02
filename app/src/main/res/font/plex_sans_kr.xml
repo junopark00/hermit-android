@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- IBM Plex Sans KR (SIL Open Font License, see hermit/IBM-Plex-OFL.txt). -->
+<font-family xmlns:android="http://schemas.android.com/apk/res/android">
+    <font android:fontStyle="normal" android:fontWeight="400" android:font="@font/plex_sans_kr_regular" />
+    <font android:fontStyle="normal" android:fontWeight="600" android:font="@font/plex_sans_kr_semibold" />
+</font-family>

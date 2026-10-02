@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hermit: base strings reworded for Hermit / Shell. -->
+<resources>
+    <string name="message_decoding_error">Hermit has crashed due to an incompatibility with this device\'s video decoder. Try adjusting the streaming settings if the crashes continue.</string>
+    <string name="summary_seekbar_deadzone">Note: Some games can enforce a larger deadzone than what Hermit is configured to use.</string>
+    <string name="summary_checkbox_usb_bind_all">Use Hermit\'s USB driver for all supported gamepads, even if native Xbox controller support is present</string>
+    <string name="summary_language_list">Language to use for Hermit</string>
+    <string name="local_network_rationale">Hermit requires local network permissions to communicate with nearby hosts</string>
+    <string name="searching_pc">Looking for host PCs on your local network…\n\nMake sure the streaming host (such as Shell) is running on your PC.</string>
+    <string name="pair_pairing_help">Enter this PIN on your host\'s pairing page (in Shell: web UI → Pairing).</string>
+    <string name="ip_hint">IP address or host name (e.g. 192.168.0.10)</string>
+    <string name="error_404">The host returned an HTTP 404 error. Make sure your PC has a supported GPU. Remote desktop software can also cause this error. Try restarting your PC or reinstalling the host software.</string>
+    <string name="summary_checkbox_enable_sops">Allow the host to change game settings for the best streaming</string>
+    <string name="summary_checkbox_touchscreen_trackpad">On: the touchscreen moves the pointer like a trackpad. Off: you touch the host screen directly (tap to click, drag to scroll, long press then drag to select or move, two-finger tap for a right click).</string>
+    <string-array name="language_names" translatable="false">
+        <item>@string/hermit_language_default</item>
+        <item>English</item>
+        <item>Italiano</item>
+        <item>日本語</item>
+        <item>Русский</item>
+        <item>Nederlands</item>
+        <item>中文(简体)</item>
+        <item>中文(繁體)</item>
+        <item>한국어</item>
+        <item>Español</item>
+        <item>Français</item>
+        <item>Deutsch</item>
+        <item>Română</item>
+        <item>Українська</item>
+        <item>Norsk bokmål</item>
+        <item>Tiếng Việt</item>
+        <item>Magyar</item>
+        <item>Ελληνικά</item>
+        <item>Português do Brasil</item>
+        <item>Čeština</item>
+        <item>עִבְרִית</item>
+        <item>Svenska</item>
+        <item>Bahasa Indonesia</item>
+        <item>Esperanto</item>
+        <item>Latviešu valoda</item>
+        <item>தமிழ்</item>
+    </string-array>
+</resources>

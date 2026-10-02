@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hermit: app list screen (overrides upstream activity_app_view) with the same 56dp top bar as
+     the PC list; the title is the PC's name. View ids are the ones AppView uses. -->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/hermit_background"
+    tools:context="com.junopark.hermit.AppView">
+
+    <LinearLayout
+        android:id="@+id/hermitAppTopBar"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_alignParentTop="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
+
+        <TextView
+            android:id="@+id/appListText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:preferKeepClear="true"
+            android:singleLine="true"
+            android:textColor="@color/hermit_text_primary"
+            android:textSize="20sp" />
+    </LinearLayout>
+
+    <View
+        android:id="@+id/hermitAppTopBarDivider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_below="@id/hermitAppTopBar"
+        android:background="@color/hermit_layer2" />
+
+    <FrameLayout
+        android:id="@+id/appFragmentContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/hermitAppTopBarDivider" />
+</RelativeLayout>

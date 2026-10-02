@@ -1,0 +1,89 @@
+Hermit for Android
+Copyright (C) 2026 Juno Park
+https://github.com/junopark00/hermit-android
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU
+General Public License as published by the Free Software Foundation, version 3 of the License. It is
+distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See LICENSE.txt for the full text.
+
+
+Origin and modifications
+------------------------
+
+Hermit for Android is a modified version of Moonlight for Android (moonlight-android), developed by
+Cameron Gutman, Diego Waxemberg and the Moonlight contributors and licensed under the GNU General
+Public License v3.0. The original project and its history are available at:
+
+  https://github.com/moonlight-stream/moonlight-android
+
+As required by section 5(a) of the GPLv3: this version was modified by Juno Park in 2026. The
+modifications include, among others, the Hermit name, artwork, theme and Korean translation; a new
+Java package (com.junopark.hermit), application ID and native library name (hermit-core); direct
+touch and trackpad input, pinch zoom, a text input bar, a virtual keypad with a quick menu, a stream
+settings panel with live and automatic bitrate control, a performance overlay, session summaries,
+clipboard sync, remote shutdown and restart, automatic reconnect, on-device crash reports, and the
+removal of the upstream project's online services. The git history of this repository starts with the
+modified version.
+
+
+Third-party components
+----------------------
+
+Each component keeps its own copyright and license.
+
+Native code (app/src/main/jni/hermit-core)
+
+  - moonlight-common-c (git submodule moonlight-common-c), GPLv3
+      https://github.com/moonlight-stream/moonlight-common-c
+      Copyright Cameron Gutman and the Moonlight contributors. Bundled inside it:
+      - ENet (moonlight-common-c/enet), MIT License, Copyright (c) 2002-2020 Lee Salzman
+      - nanors (moonlight-common-c/nanors, with its oblas code in nanors/deps), MIT License,
+        Copyright (c) 2021 Joseph Calderon
+  - minisdl.c and usb_ids.h: from SDL (Simple DirectMedia Layer), zlib License,
+      Copyright (C) 1997-2026 Sam Lantinga
+  - controller_list.h and controller_type.h: zlib License, Copyright (C) Valve Corporation
+  - OpenSSL 4.0.2 (openssl/, prebuilt libcrypto and headers), Apache License 2.0
+      https://www.openssl.org
+  - Opus (opus/, prebuilt libopus and headers), BSD 3-Clause License, Copyright Xiph.Org Foundation
+      and contributors. https://opus-codec.org
+    The prebuilt OpenSSL and Opus libraries were built from
+    https://github.com/cgutman/moonlight-mobile-deps (see hermit-core/Build.txt).
+  - cpufeatures (from the Android NDK, linked statically), BSD 2-Clause License, Copyright (C) 2010
+      The Android Open Source Project
+
+Java libraries (Maven dependencies, see app/build.gradle)
+
+  - Bouncy Castle (bcprov-jdk18on, bcpkix-jdk18on), Bouncy Castle Licence (MIT style)
+      https://www.bouncycastle.org
+  - OkHttp, with Okio and the Kotlin standard library, Apache License 2.0
+      https://square.github.io/okhttp/
+  - JmDNS, Apache License 2.0
+      https://github.com/jmdns/jmdns
+  - JCodec, FreeBSD (BSD 2-Clause) License
+      http://jcodec.org
+  - ShieldControllerExtensions, MIT License, Copyright Cameron Gutman
+      https://github.com/cgutman/ShieldControllerExtensions
+  - desugar_jdk_libs (core library desugaring), GNU GPL v2 with the Classpath Exception
+      https://github.com/google/desugar_jdk_libs
+
+Fonts (app/src/main/res/font)
+
+  - IBM Plex Sans KR (Regular, SemiBold) and IBM Plex Sans Condensed (Medium), unmodified,
+      SIL Open Font License 1.1, Copyright IBM Corp. See hermit/IBM-Plex-OFL.txt.
+      https://github.com/IBM/plex
+
+Other material from the upstream project
+
+  - tools/wireshark/*.lua: Wireshark dissectors for the streaming protocol, by the Moonlight authors
+      (Cameron Gutman, Diego Waxemberg), GPLv3 as part of moonlight-android.
+  - docs/decoder-errata.txt: notes on MediaCodec decoder quirks, from moonlight-android (GPLv3).
+  - The translations in app/src/main/res/values-*/strings.xml were contributed to moonlight-android
+      by its translators (GPLv3); the Korean translation was revised and extended for Hermit.
+
+
+Trademarks
+----------
+
+Hermit is not affiliated with, endorsed by or sponsored by NVIDIA Corporation or the Moonlight
+project. NVIDIA and GameStream are trademarks of NVIDIA Corporation.

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hermit settings lists. Metric keys must match StatsOverlay.KEYS. -->
+<resources>
+    <string-array name="hermit_overlay_metric_names">
+        <item>@string/hermit_metric_video</item>
+        <item>@string/hermit_metric_frame_rates</item>
+        <item>@string/hermit_metric_bitrate</item>
+        <item>@string/hermit_metric_network_loss</item>
+        <item>@string/hermit_metric_rtt</item>
+        <item>@string/hermit_metric_host_latency</item>
+        <item>@string/hermit_metric_decode</item>
+        <item>@string/hermit_metric_total_latency</item>
+        <item>@string/hermit_metric_decoder</item>
+        <item>@string/hermit_metric_device</item>
+    </string-array>
+    <string-array name="hermit_overlay_metric_values" translatable="false">
+        <item>video</item>
+        <item>frame_rates</item>
+        <item>bitrate</item>
+        <item>network_loss</item>
+        <item>rtt</item>
+        <item>host_latency</item>
+        <item>decode</item>
+        <item>total_latency</item>
+        <item>decoder</item>
+        <item>device</item>
+    </string-array>
+    <!-- Same as StatsOverlay.DEFAULT_METRICS -->
+    <string-array name="hermit_overlay_metric_defaults" translatable="false">
+        <item>video</item>
+        <item>bitrate</item>
+        <item>network_loss</item>
+        <item>rtt</item>
+        <item>host_latency</item>
+        <item>total_latency</item>
+    </string-array>
+    <string-array name="hermit_overlay_size_names">
+        <item>@string/hermit_overlay_size_small</item>
+        <item>@string/hermit_overlay_size_medium</item>
+        <item>@string/hermit_overlay_size_large</item>
+    </string-array>
+    <string-array name="hermit_overlay_size_values" translatable="false">
+        <item>small</item>
+        <item>medium</item>
+        <item>large</item>
+    </string-array>
+    <string-array name="hermit_panel_handle_side_names">
+        <item>@string/hermit_panel_handle_right</item>
+        <item>@string/hermit_panel_handle_left</item>
+    </string-array>
+    <string-array name="hermit_panel_handle_side_values" translatable="false">
+        <item>right</item>
+        <item>left</item>
+    </string-array>
+</resources>

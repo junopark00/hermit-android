@@ -1,0 +1,29 @@
+<resources>
+    <!-- Hermit theme for API 29+: values-v21 plus the upstream v29 tweaks and Plex Sans KR. -->
+    <style name="AppBaseTheme" parent="android:Theme.Material">
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <!-- Avoid some systems like MIUI which break the visibility of games title -->
+        <item name="android:forceDarkAllowed">false</item>
+        <item name="android:fontFamily">@font/plex_sans_kr</item>
+        <item name="android:colorPrimary">@color/hermit_layer1</item>
+        <item name="android:colorPrimaryDark">@color/hermit_background</item>
+        <item name="android:colorAccent">@color/hermit_accent</item>
+        <item name="android:colorControlActivated">@color/hermit_accent</item>
+        <item name="android:colorControlNormal">@color/hermit_text_helper</item>
+        <item name="android:colorButtonNormal">@color/hermit_layer2</item>
+        <item name="android:colorBackground">@color/hermit_background</item>
+        <item name="android:windowBackground">@color/hermit_background</item>
+        <item name="android:textColorPrimary">@color/hermit_text_primary</item>
+        <item name="android:textColorSecondary">@color/hermit_text_secondary</item>
+        <item name="android:alertDialogTheme">@style/HermitAlertDialog</item>
+    </style>
+
+    <style name="HermitAlertDialog" parent="android:Theme.Material.Dialog.Alert">
+        <item name="android:colorBackground">@color/hermit_layer1</item>
+        <item name="android:colorAccent">@color/hermit_accent</item>
+        <item name="android:textColorPrimary">@color/hermit_text_primary</item>
+        <item name="android:textColorSecondary">@color/hermit_text_secondary</item>
+        <item name="android:fontFamily">@font/plex_sans_kr</item>
+    </style>
+</resources>

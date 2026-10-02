@@ -1,0 +1,150 @@
+apply plugin: 'com.android.application'
+
+android {
+    ndkVersion "29.0.14206865"
+
+    compileSdk 37
+
+    namespace 'com.junopark.hermit'
+
+    defaultConfig {
+        minSdk 21
+        targetSdk 36
+
+        versionName "1.0.0"
+        // Hermit's own version line; it started again at 1 with the io.github.junopark00.hermit ID.
+        versionCode = 1
+
+        // Generate native debug symbols to allow Google Play to symbolicate our native crashes
+        ndk.debugSymbolLevel = 'FULL'
+    }
+
+    flavorDimensions.add("root")
+
+    buildFeatures {
+        buildConfig = true
+        resValues = true
+    }
+
+    productFlavors {
+        root {
+            // Android O has native mouse capture, so don't show the rooted
+            // version to devices running O on the Play Store.
+            maxSdk 25
+
+            externalNativeBuild {
+                ndkBuild {
+                    arguments "PRODUCT_FLAVOR=root"
+                }
+            }
+
+            // The root flavour (rooted devices up to Android 7.1, evdev input capture) is not
+            // released; it gets its own ID so it can be installed next to the regular build.
+            applicationId "io.github.junopark00.hermit.root"
+            dimension "root"
+            buildConfigField "boolean", "ROOT_BUILD", "true"
+        }
+
+        nonRoot {
+            externalNativeBuild {
+                ndkBuild {
+                    arguments "PRODUCT_FLAVOR=nonRoot"
+                }
+            }
+
+            // Hermit's application ID. Keep it: a different ID installs as a separate app without
+            // the existing pairing and settings. The Java namespace (com.junopark.hermit) is separate
+            // and must stay, because the JNI function names in hermit-core are derived from it.
+            applicationId "io.github.junopark00.hermit"
+            dimension "root"
+            buildConfigField "boolean", "ROOT_BUILD", "false"
+        }
+    }
+
+    compileOptions {
+        encoding "UTF-8"
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled true
+    }
+
+    lint {
+        disable 'MissingTranslation'
+        lintConfig file('lint.xml')
+    }
+
+    bundle {
+        language {
+            // Avoid splitting by language, since we allow users
+            // to manually switch language in settings.
+            enableSplit = false
+        }
+        density {
+            // FIXME: This should not be necessary but we get
+            // weird crashes due to missing drawable resources
+            // when this split is enabled.
+            enableSplit = false
+        }
+    }
+
+    // Release signing. keystore.properties in the repository root (git-ignored) holds storeFile,
+    // storePassword, keyAlias and keyPassword; hermit/build-android.ps1 can create it. Without the
+    // file, release builds are left unsigned.
+    def hermitKeystoreProps = rootProject.file('keystore.properties')
+    if (hermitKeystoreProps.exists()) {
+        def props = new Properties()
+        hermitKeystoreProps.withInputStream { props.load(it) }
+        signingConfigs {
+            hermitRelease {
+                storeFile file(props['storeFile'])
+                storePassword props['storePassword']
+                keyAlias props['keyAlias']
+                keyPassword props['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix ".debug"
+            resValue "string", "app_label", "Hermit (Debug)"
+            resValue "string", "app_label_root", "Hermit (Root Debug)"
+        }
+        release {
+            // Release builds carry Hermit's own application ID (nonRoot: io.github.junopark00.hermit):
+            // the ID ties the app to its signing key and its users' data.
+            resValue "string", "app_label", "Hermit"
+            resValue "string", "app_label_root", "Hermit (Root)"
+            if (hermitKeystoreProps.exists()) {
+                signingConfig signingConfigs.hermitRelease
+            }
+
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    externalNativeBuild {
+        ndkBuild {
+            path "src/main/jni/Android.mk"
+        }
+    }
+
+    packaging {
+        resources {
+            // BouncyCastle includes duplicate LICENSE.md files
+            excludes += '/META-INF/*.md'
+        }
+    }
+}
+
+dependencies {
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.85.2'
+    implementation 'org.bouncycastle:bcpkix-jdk18on:1.85'
+    implementation 'org.jcodec:jcodec:0.2.5'
+    implementation 'com.squareup.okhttp3:okhttp:5.5.0'
+    implementation 'org.jmdns:jmdns:3.6.3'
+    implementation 'com.github.cgutman:ShieldControllerExtensions:1.0.1'
+
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+}

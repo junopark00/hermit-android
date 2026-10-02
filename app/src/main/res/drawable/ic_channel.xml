@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android TV channel logo: the launcher artwork on Hermit's background -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/hermit_background"/>
+    <item android:drawable="@drawable/hermit_launcher_foreground"/>
+</layer-list>
