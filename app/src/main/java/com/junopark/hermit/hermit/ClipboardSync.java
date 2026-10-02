@@ -664,20 +664,12 @@ public class ClipboardSync {
                     return;
                 }
                 break;
-            case 500:
-                if (image) {
-                    // The host could not take this image (e.g. could not decode it): sending it
-                    // again would fail the same way
-                    reportSendFailure(key, R.string.hermit_clipboard_send_failed);
-                    markRefused(key, timestamp);
-                    return;
-                }
-                break;
             default:
                 break;
         }
-        // Anything else (403 while the host sets up the stream, 500 for text, ...): said once
-        // for this clip and tried again on the next return to the stream
+        // Anything else (403 while the host sets up the stream, 500 when the host clipboard was
+        // busy or an image could not be set, ...): said once for this clip and tried again on
+        // the next return to the stream
         reportSendFailure(key, R.string.hermit_clipboard_send_failed);
     }
 
