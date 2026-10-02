@@ -468,16 +468,26 @@ public class NvHTTP {
      * the request starts, which the dispatcher's cancelAll() cannot reach yet.
      */
     private Response execute(OkHttpClient client, Request request) throws IOException {
-        Call call = performAndroidTlsHack(client).newCall(request);
-        activeCalls.add(call);
+        Call call = newRegisteredCall(client, request);
         try {
-            if (cancelled) {
-                call.cancel(); // execute() then fails at once
-            }
             return call.execute();
         } finally {
             activeCalls.remove(call);
         }
+    }
+
+    /**
+     * Hermit: a call that cancelPendingRequests() aborts until the caller removes it from
+     * activeCalls, also while its response body is read: register, then check the flag (and cancel
+     * the call if it is set, so that execute() fails at once).
+     */
+    private Call newRegisteredCall(OkHttpClient client, Request request) {
+        Call call = performAndroidTlsHack(client).newCall(request);
+        activeCalls.add(call);
+        if (cancelled) {
+            call.cancel();
+        }
+        return call;
     }
 
     private HttpUrl getCompleteUrl(HttpUrl baseUrl, String path, String query) {
@@ -926,8 +936,10 @@ public class NvHTTP {
     // arrive as HostHttpResponseException (401 permission denied, 403 not streaming,
     // 400 type not supported, 404 no clipboard endpoint, 413 too large, 422 content the host
     // cannot hand over, 503 host clipboard busy). For a 422 the error message is the first line
-    // of Shell's body, which says why (e.g. "image-not-convertible").
-    private Response hermitClipboardCall(String type, byte[] body, String contentType) throws IOException {
+    // of Shell's body, which says why (e.g. "image-not-convertible"). The call stays registered
+    // until its reply was read, so cancelPendingRequests() also aborts the read of a large body.
+    private <T> T hermitClipboardCall(String type, byte[] body, String contentType,
+                                      ClipboardReply<T> reply) throws IOException {
         HttpUrl url = getHttpsUrl(true).newBuilder()
                 .addPathSegments("actions/clipboard")
                 .addQueryParameter("type", type)
@@ -944,14 +956,22 @@ public class NvHTTP {
         if (cancelled) {
             throw new IOException("Cancelled");
         }
-        Response response = execute(client, request.build());
-        if (!response.isSuccessful()) {
-            int code = response.code();
-            String message = code == 422 ? firstBodyLine(response.body()) : response.message();
-            response.close();
-            throw new HostHttpResponseException(code, message);
+        Call call = newRegisteredCall(client, request.build());
+        try (Response response = call.execute()) {
+            if (!response.isSuccessful()) {
+                int code = response.code();
+                String message = code == 422 ? firstBodyLine(response.body()) : response.message();
+                throw new HostHttpResponseException(code, message);
+            }
+            return reply.read(response.body());
+        } finally {
+            activeCalls.remove(call);
         }
-        return response;
+    }
+
+    /** Hermit: reads the body of a successful clipboard reply (null if there is none). */
+    private interface ClipboardReply<T> {
+        T read(ResponseBody body) throws IOException;
     }
 
     /** The first line of a short error body (at most 256 bytes are read), or "" if there is none. */
@@ -975,8 +995,7 @@ public class NvHTTP {
     }
 
     public byte[] hermitGetClipboard(String type, int maxBytes) throws IOException {
-        try (Response response = hermitClipboardCall(type, null, null)) {
-            ResponseBody body = response.body();
+        return hermitClipboardCall(type, null, null, body -> {
             if (body == null) {
                 return new byte[0];
             }
@@ -989,7 +1008,7 @@ public class NvHTTP {
                 throw new HostHttpResponseException(413, "Clipboard content too large");
             }
             return data;
-        }
+        });
     }
 
     /**
@@ -1027,10 +1046,7 @@ public class NvHTTP {
 
     /** Returns the host's reply ("seq=N" from Shell, empty from other hosts). */
     public String hermitSetClipboard(String type, byte[] data, String contentType) throws IOException {
-        try (Response response = hermitClipboardCall(type, data, contentType)) {
-            ResponseBody body = response.body();
-            return body != null ? body.string() : "";
-        }
+        return hermitClipboardCall(type, data, contentType, body -> body != null ? body.string() : "");
     }
 
     /** What Shell answers to GET /actions/power?action=query. */
