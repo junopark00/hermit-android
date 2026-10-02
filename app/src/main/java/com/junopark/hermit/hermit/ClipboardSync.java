@@ -128,6 +128,9 @@ public class ClipboardSync {
     // stream only, so a later stream to another host still tries it
     private String hostRefusedKey;
     private long hostRefusedClipTimestamp = -1;
+    // The device clip queued for sending and not yet sent or given up on (a slow image upload,
+    // or waiting for the host to accept clipboard calls): not queued again on another return
+    private String inFlightKey;
 
     public ClipboardSync(Activity activity, NvHTTP http) {
         this.activity = activity;
@@ -215,7 +218,11 @@ public class ClipboardSync {
                 hostRefusedClipTimestamp = timestamp;
                 return;
             }
+            if (key.equals(inFlightKey)) {
+                return; // still being sent
+            }
             final String mime = appContext.getContentResolver().getType(uri);
+            inFlightKey = key;
             handler.post(() -> pushImage(uri, mime, key, timestamp));
             return;
         }
@@ -241,6 +248,10 @@ public class ClipboardSync {
             hostRefusedClipTimestamp = timestamp;
             return;
         }
+        if (key.equals(inFlightKey)) {
+            return; // still being sent
+        }
+        inFlightKey = key;
         handler.post(() -> pushText(value, key, timestamp));
     }
 
@@ -249,6 +260,7 @@ public class ClipboardSync {
         activity.runOnUiThread(() -> {
             rememberExchanged(key);
             rememberSeen(timestamp);
+            clearInFlight(key);
         });
     }
 
@@ -260,6 +272,7 @@ public class ClipboardSync {
         activity.runOnUiThread(() -> {
             refusedKey = key;
             rememberSeen(timestamp);
+            clearInFlight(key);
         });
     }
 
@@ -271,7 +284,19 @@ public class ClipboardSync {
         activity.runOnUiThread(() -> {
             hostRefusedKey = key;
             hostRefusedClipTimestamp = timestamp;
+            clearInFlight(key);
         });
+    }
+
+    /** Worker thread: a device clip was not sent this time; it is tried again on the next return. */
+    private void markNotSent(String key) {
+        activity.runOnUiThread(() -> clearInFlight(key));
+    }
+
+    private void clearInFlight(String key) {
+        if (key.equals(inFlightKey)) {
+            inFlightKey = null; // a newer clip queued since stays in flight
+        }
     }
 
     /** Any thread: files are not synced; said once per stream. */
@@ -583,7 +608,9 @@ public class ClipboardSync {
         }
         if (!ensureReady()) {
             if (mode == Mode.UNKNOWN) {
-                deferredPush = () -> pushText(text, key, timestamp);
+                deferredPush = () -> pushText(text, key, timestamp); // stays in flight until then
+            } else {
+                markNotSent(key);
             }
             return;
         }
@@ -604,6 +631,7 @@ public class ClipboardSync {
         } catch (IOException e) {
             HermitLog.warning("Clipboard text not sent: " + e);
             reportSendFailure(key, R.string.hermit_clipboard_send_failed); // tried again next time
+            markNotSent(key);
         }
     }
 
@@ -613,7 +641,9 @@ public class ClipboardSync {
         }
         if (!ensureReady()) {
             if (mode == Mode.UNKNOWN) {
-                deferredPush = () -> pushImage(uri, mime, key, timestamp);
+                deferredPush = () -> pushImage(uri, mime, key, timestamp); // stays in flight until then
+            } else {
+                markNotSent(key);
             }
             return;
         }
@@ -668,6 +698,7 @@ public class ClipboardSync {
         } catch (IOException e) {
             HermitLog.warning("Clipboard image not sent: " + e);
             reportSendFailure(key, R.string.hermit_clipboard_send_failed); // tried again next time
+            markNotSent(key);
         }
     }
 
@@ -716,10 +747,12 @@ public class ClipboardSync {
                     writeDenied = true;
                     toast(R.string.hermit_clipboard_write_denied, HermitNotice.LONG);
                 }
+                markNotSent(key);
                 return;
             case 404:
                 mode = Mode.DISABLED;
                 HermitLog.info("Clipboard sync: host has no clipboard endpoint");
+                markNotSent(key);
                 return;
             case 413:
                 // Larger than this host takes (Shell: 32 MB or 8192x8192 pixels for an image)
@@ -759,6 +792,7 @@ public class ClipboardSync {
         // busy or the first time an image could not be set, ...): said once for this clip and
         // tried again on the next return to the stream
         reportSendFailure(key, R.string.hermit_clipboard_send_failed);
+        markNotSent(key);
     }
 
     /** A device clip could not be sent: said once per clip, however often it is tried. */
