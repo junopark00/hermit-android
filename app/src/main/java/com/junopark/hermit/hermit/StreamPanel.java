@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.media.MediaCodecInfo;
 import android.os.Build;
@@ -175,6 +176,7 @@ public class StreamPanel {
     private final TextView trackpadSpeedLabel, scrollSpeedLabel, overlaySizeLabel;
     private final LinearLayout metricsList;
     private final Button applyButton, revertButton;
+    private final boolean touchscreen;
     private boolean updating;
     private boolean handleHidden;  // setHandleVisible(false): stays hidden when the panel closes
 
@@ -184,6 +186,7 @@ public class StreamPanel {
         this.appName = appName;
         this.prefs = PreferenceManager.getDefaultSharedPreferences(activity);
         this.codecValues = activity.getResources().getStringArray(R.array.video_format_values);
+        this.touchscreen = activity.getPackageManager().hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN);
 
         startResolution = config.width + "x" + config.height;
         startFps = Integer.toString(config.fps);
@@ -265,6 +268,13 @@ public class StreamPanel {
             host.onOpenTextInput();
         });
         zoomSwitch.setVisibility(ZoomController.isSupported() ? View.VISIBLE : View.GONE);
+        if (!touchscreen) {
+            // Touch-only input options, as Settings hides them without a touchscreen
+            for (View view : new View[]{trackpadSwitch, trackpadSpeedLabel, trackpadSpeed, scrollSpeedLabel,
+                    scrollSpeed, zoomSwitch, oscSwitch, keypadSwitch, root.findViewById(R.id.hermitPanelKeypadEdit)}) {
+                view.setVisibility(View.GONE);
+            }
+        }
         root.findViewById(R.id.hermitPanelKeypadEdit).setOnClickListener(v -> host.onOpenKeypadEditor());
 
         findDeviceOptions(config);
@@ -1073,6 +1083,11 @@ public class StreamPanel {
 
     public boolean isTrackpad() {
         return prefs.getBoolean(TRACKPAD, PreferenceConfiguration.DEFAULT_TOUCHSCREEN_TRACKPAD);
+    }
+
+    /** False on devices without a touchscreen (TV, ...): touch-only options are not offered. */
+    public boolean hasTouchscreen() {
+        return touchscreen;
     }
 
     public void setTrackpad(boolean trackpad) {

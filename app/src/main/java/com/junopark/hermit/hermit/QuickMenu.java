@@ -117,12 +117,15 @@ public class QuickMenu {
         title.setTypeface(title.getTypeface(), Typeface.BOLD);
         card.addView(title);
 
-        // Touch mode
-        card.addView(section(R.string.hermit_quick_touch));
-        boolean trackpad = panel.isTrackpad();
-        card.addView(choices(new String[]{
-                activity.getString(R.string.hermit_quick_touch_direct),
-                activity.getString(R.string.hermit_quick_touch_trackpad)}, trackpad ? 1 : 0, i -> panel.setTrackpad(i == 1)));
+        // Touch mode (not offered without a touchscreen, like the stream panel)
+        boolean touchscreen = panel.hasTouchscreen();
+        if (touchscreen) {
+            card.addView(section(R.string.hermit_quick_touch));
+            boolean trackpad = panel.isTrackpad();
+            card.addView(choices(new String[]{
+                    activity.getString(R.string.hermit_quick_touch_direct),
+                    activity.getString(R.string.hermit_quick_touch_trackpad)}, trackpad ? 1 : 0, i -> panel.setTrackpad(i == 1)));
+        }
 
         // Quality
         card.addView(section(R.string.hermit_quick_quality));
@@ -172,7 +175,9 @@ public class QuickMenu {
         dlp.bottomMargin = dp(4);
         card.addView(divider, dlp);
         card.addView(action(R.string.hermit_quick_text_input, () -> host.onOpenTextInput()));
-        card.addView(action(R.string.hermit_quick_keypad_edit, () -> host.onOpenKeypadEditor()));
+        if (touchscreen) {
+            card.addView(action(R.string.hermit_quick_keypad_edit, () -> host.onOpenKeypadEditor()));
+        }
         boolean overlay = panel.isOverlayShown();
         card.addView(action(overlay ? R.string.hermit_quick_overlay_hide : R.string.hermit_quick_overlay_show,
                 () -> panel.setOverlayShown(!overlay)));

@@ -349,6 +349,18 @@ public class StreamSettings extends Activity {
                 PreferenceCategory category =
                         (PreferenceCategory) findPreference("category_onscreen_controls");
                 screen.removePreference(category);
+
+                // Hermit: and the touch-only input options (the stream panel hides them too). The
+                // trackpad speed depends on the trackpad switch, so it goes first.
+                PreferenceCategory input = (PreferenceCategory) findPreference("category_input_settings");
+                for (String key : new String[]{"seekbar_hermit_trackpad_speed", "seekbar_hermit_scroll_speed",
+                        "checkbox_touchscreen_trackpad", com.junopark.hermit.hermit.HermitPreferences.PINCH_ZOOM_PREF,
+                        "hermit_keypad_editor"}) {
+                    Preference pref = input.findPreference(key);
+                    if (pref != null) {
+                        input.removePreference(pref);
+                    }
+                }
             }
 
             // Hide remote desktop mouse mode on pre-Oreo (which doesn't have pointer capture)

@@ -169,6 +169,9 @@ the screen edge opens it too.
   hides it), screen orientation, input (trackpad mode, trackpad speed, scroll speed, pinch zoom,
   on-screen controls, virtual keypad) and other options (clipboard sync, handle position). Options
   that do not apply to the current mode are dimmed.
+- On devices without a touchscreen (Android TV, for example) the touch-only options (trackpad mode,
+  trackpad and scroll speed, pinch zoom, on-screen controls, virtual keypad) are not shown, in the
+  panel, the keypad's quick menu or Settings.
 - **Screen orientation:** auto (default) follows the longer side of the stream resolution. Landscape
   and portrait lock the orientation. Rotating does not interrupt the stream.
 - **Bitrate (live changes need Shell):** with Shell (NVIDIA encoder) a new bitrate applies as soon as
