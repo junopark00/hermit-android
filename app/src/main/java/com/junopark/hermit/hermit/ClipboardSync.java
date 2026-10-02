@@ -15,6 +15,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.text.TextUtils;
 
 import com.junopark.hermit.HermitLog;
 import com.junopark.hermit.R;
@@ -71,6 +72,9 @@ public class ClipboardSync {
     // legacyHostTextKey while the host text is too large to fetch
     private static final String LEGACY_TOO_LARGE = "toolarge";
     private static final String STATE_PREFS = "HermitClipboard";
+    // Label of the clips Hermit puts on the device clipboard: readable from the clip description
+    // without Android's paste notice, so Hermit's own clip is not taken for a device copy
+    private static final String OWN_CLIP_LABEL = "Hermit host clipboard";
 
     private enum Mode { UNKNOWN, EXTENDED, LEGACY, DISABLED }
 
@@ -150,6 +154,10 @@ public class ClipboardSync {
     // The device clip deviceCopied() last ran for, so a clip that is not sent is not taken again
     // for a newer copy on each return
     private long copiedClipTimestamp = -1;
+    // Wall-clock time (the base of clip timestamps) around the last setPrimaryClip() of host
+    // content: a clip stamped in it is ours even if its description could not be read afterwards
+    private long ownClipFrom = -1;
+    private long ownClipTo = -1;
 
     public ClipboardSync(Activity activity, NvHTTP http) {
         this.activity = activity;
@@ -204,6 +212,14 @@ public class ClipboardSync {
             return;
         }
         long timestamp = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ? description.getTimestamp() : -1;
+        if (isOwnClip(description, timestamp)) {
+            // The host content we put there: nothing to send, and not a device copy (onFocusLost
+            // cannot always record its timestamp: Android 10+ denies the read once focus is gone)
+            if (timestamp > 0 && timestamp != lastSeenClipTimestamp) {
+                rememberSeen(timestamp);
+            }
+            return;
+        }
         if (timestamp > 0 && timestamp != lastSeenClipTimestamp && timestamp != copiedClipTimestamp) {
             // Not the host content we put there (that one was seen): the user copied something
             // on the device, whether it can be sent or not
@@ -355,6 +371,12 @@ public class ClipboardSync {
         }
     }
 
+    /** Whether the device clip is host content Hermit put there (by its label, or its timestamp). */
+    private boolean isOwnClip(ClipDescription description, long timestamp) {
+        return TextUtils.equals(OWN_CLIP_LABEL, description.getLabel())
+                || (timestamp > 0 && timestamp >= ownClipFrom && timestamp <= ownClipTo);
+    }
+
     /** Any thread: files are not synced; said once per stream. */
     private void showFilesNotice() {
         if (!filesNoticeShown.getAndSet(true)) {
@@ -380,17 +402,21 @@ public class ClipboardSync {
         }
         ClipData clip;
         if (content.text != null) {
-            clip = ClipData.newPlainText("Hermit", content.text);
+            clip = ClipData.newPlainText(OWN_CLIP_LABEL, content.text);
         } else {
-            clip = ClipData.newUri(appContext.getContentResolver(), "Hermit",
+            clip = ClipData.newUri(appContext.getContentResolver(), OWN_CLIP_LABEL,
                     ClipboardImageProvider.uriFor(appContext, content.imageName));
         }
+        // Android stamps the clip with System.currentTimeMillis() during this (synchronous) call
+        long before = System.currentTimeMillis();
         try {
             cm.setPrimaryClip(clip);
         } catch (RuntimeException e) {
             HermitLog.warning("Clipboard: could not set the device clipboard: " + e);
             return;
         }
+        ownClipFrom = before;
+        ownClipTo = System.currentTimeMillis();
         rememberExchanged(content.key);
         ClipDescription description = cm.getPrimaryClipDescription();
         if (description != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
