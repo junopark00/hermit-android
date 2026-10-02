@@ -24,11 +24,14 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Set;
 import java.util.Stack;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.HostnameVerifier;
@@ -55,6 +58,7 @@ import com.junopark.hermit.nvstream.ConnectionContext;
 import com.junopark.hermit.nvstream.http.PairingManager.PairState;
 import com.junopark.hermit.nvstream.jni.MoonBridge;
 
+import okhttp3.Call;
 import okhttp3.ConnectionPool;
 import okhttp3.HttpUrl;
 import okhttp3.MediaType;
@@ -459,6 +463,23 @@ public class NvHTTP {
         }
     }
 
+    /**
+     * Hermit: runs a request that cancelPendingRequests() aborts even when it comes just before
+     * the request starts, which the dispatcher's cancelAll() cannot reach yet.
+     */
+    private Response execute(OkHttpClient client, Request request) throws IOException {
+        Call call = performAndroidTlsHack(client).newCall(request);
+        activeCalls.add(call);
+        try {
+            if (cancelled) {
+                call.cancel(); // execute() then fails at once
+            }
+            return call.execute();
+        } finally {
+            activeCalls.remove(call);
+        }
+    }
+
     private HttpUrl getCompleteUrl(HttpUrl baseUrl, String path, String query) {
         boolean pairing = path.equals("pair") || path.equals("unpair");
         return baseUrl.newBuilder()
@@ -483,7 +504,7 @@ public class NvHTTP {
         }
         HttpUrl completeUrl = getCompleteUrl(baseUrl, path, query);
         Request request = new Request.Builder().url(completeUrl).get().build();
-        Response response = performAndroidTlsHack(client).newCall(request).execute();
+        Response response = execute(client, request);
 
         ResponseBody body = response.body();
         
@@ -774,11 +795,16 @@ public class NvHTTP {
     public void cancelPendingRequests() {
         // Also the requests between the steps of a pairing, which cancelAll() can't reach
         cancelled = true;
+        for (Call call : activeCalls) {
+            call.cancel(); // also one created but not started yet
+        }
         httpClientLongConnectTimeout.dispatcher().cancelAll();
     }
 
     // Set by cancelPendingRequests(): later requests on this connection fail at once
     private volatile boolean cancelled;
+    // The requests of execute() in flight
+    private final Set<Call> activeCalls = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     public void unpair() throws IOException {
         openHttpConnectionToString(httpClientLongConnectTimeout, baseUrlHttp, "unpair");
@@ -918,7 +944,7 @@ public class NvHTTP {
         if (cancelled) {
             throw new IOException("Cancelled");
         }
-        Response response = performAndroidTlsHack(client).newCall(request.build()).execute();
+        Response response = execute(client, request.build());
         if (!response.isSuccessful()) {
             int code = response.code();
             String message = code == 422 ? firstBodyLine(response.body()) : response.message();
