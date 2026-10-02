@@ -133,6 +133,9 @@ public class ClipboardSync {
     // A device clip that arrived before the host accepted clipboard calls (e.g. 403 right
     // after the stream started); sent once setup succeeds.
     private Runnable deferredPush;
+    // Whether setup was tried already: only the try at stream start records the host's content
+    // as there before the stream (ClipboardChangeOrder.hostSetUp)
+    private boolean setupTried;
 
     // Written by the worker, read on the UI thread
     private volatile HostContent pending;
@@ -447,14 +450,25 @@ public class ClipboardSync {
         if (stopped) {
             return;
         }
+        // A setup that failed at stream start and succeeds now cannot tell whether the host's
+        // clipboard changed in between: what it finds is a host change found now, so a device
+        // clip from before it (waiting in deferredPush) does not overwrite it, and the next poll
+        // fetches it. When the host did not change after all, its content wins over that clip
+        // (copy it again to send it), which is better than overwriting a copy made on the host.
+        boolean atStart = !setupTried;
+        setupTried = true;
+        if (!atStart) {
+            HermitLog.info("Clipboard sync: setting up again after it failed at stream start");
+        }
         try {
+            long requested = System.currentTimeMillis();
             String info = new String(http.hermitGetClipboard("info", 4096), StandardCharsets.UTF_8);
             long seq = parseLong(info, "seq");
             if (seq >= 0) {
-                // Shell: remember the current host state but do not copy it; only changes made
-                // during the stream come back to the device.
+                // Shell: remember the current host state but do not copy it (at stream start);
+                // only changes made during the stream come back to the device.
                 mode = Mode.EXTENDED;
-                order.hostRecorded(seqKey(seq));
+                order.hostSetUp(seqKey(seq), atStart, requested);
                 HermitLog.info("Clipboard sync: host supports text and images");
                 schedulePoll(EXTENDED_POLL_MS);
                 runDeferredPush();
@@ -488,11 +502,14 @@ public class ClipboardSync {
         }
 
         HermitLog.info("Clipboard sync: host supports text only");
+        long requested = System.currentTimeMillis();
         try {
-            order.hostRecorded(textKey(new String(http.hermitGetClipboard("text", MAX_TEXT_BYTES), StandardCharsets.UTF_8)));
+            byte[] text = http.hermitGetClipboard("text", MAX_TEXT_BYTES);
+            order.hostSetUp(textKey(new String(text, StandardCharsets.UTF_8)), atStart, requested);
         } catch (HostHttpResponseException e) {
             if (e.getErrorCode() == 413) {
-                order.hostRecorded(LEGACY_TOO_LARGE); // there before the stream: nothing to say
+                // At stream start: there before the stream, nothing to say
+                order.hostSetUp(LEGACY_TOO_LARGE, atStart, requested);
             } else {
                 handleReadError(e);
             }
@@ -552,12 +569,15 @@ public class ClipboardSync {
     }
 
     private void pollExtended() throws IOException {
+        // A host change counts from when this request was issued, not from when it returned
+        // (which a slow reply would make later than a device copy made meanwhile)
+        long requested = System.currentTimeMillis();
         String info = new String(http.hermitGetClipboard("info", 4096), StandardCharsets.UTF_8);
         long seq = parseLong(info, "seq");
         if (seq < 0) {
             return;
         }
-        switch (order.hostSeen(seqKey(seq), System.currentTimeMillis(), latestDeviceCopy)) {
+        switch (order.hostSeen(seqKey(seq), requested, latestDeviceCopy)) {
             case UNCHANGED:
                 return;
             case SUPERSEDED:
@@ -704,6 +724,7 @@ public class ClipboardSync {
     }
 
     private void pollLegacy() throws IOException {
+        long requested = System.currentTimeMillis(); // as in pollExtended
         byte[] data;
         try {
             data = http.hermitGetClipboard("text", MAX_TEXT_BYTES);
@@ -712,7 +733,7 @@ public class ClipboardSync {
                 throw e;
             }
             // The host text changed to something too large: the older text is not applied
-            if (order.hostSeen(LEGACY_TOO_LARGE, System.currentTimeMillis(), latestDeviceCopy)
+            if (order.hostSeen(LEGACY_TOO_LARGE, requested, latestDeviceCopy)
                     == ClipboardChangeOrder.HostContent.FETCH) {
                 pending = null;
                 reportHostTooLarge();
@@ -725,7 +746,7 @@ public class ClipboardSync {
         String text = new String(data, StandardCharsets.UTF_8);
         String key = textKey(text);
         // The text comes with the check, so nothing is ever fetched again here
-        if (order.hostSeen(key, System.currentTimeMillis(), latestDeviceCopy)
+        if (order.hostSeen(key, requested, latestDeviceCopy)
                 == ClipboardChangeOrder.HostContent.FETCH) {
             pending = new HostContent(text, null, key, order.hostTime());
         }

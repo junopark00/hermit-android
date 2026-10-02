@@ -318,9 +318,11 @@ Turn it on in Settings → Advanced, then choose **Performance overlay: metrics 
 - Android only lets the visible app read the clipboard, and leaving the app ends the stream. Hermit
   therefore checks the host clipboard's change counter once a second while streaming, fetches changes
   ahead of time and puts them on the device clipboard the moment you leave.
-- The most recent change wins. A host change counts from the moment Hermit first finds it (up to about
-  a second after it was made), a device copy from the time Android stamps on it (Android 8.0 and
-  later). When you return to the stream, a device copy is sent only if the host clipboard has not
+- The most recent change wins. A host change counts from the moment Hermit starts the check that
+  first finds it, a device copy from the time Android stamps on it (Android 8.0 and later). That is
+  up to about a second after the host change was made, or longer while an image is being sent or
+  fetched: the check waits for that transfer, so a host change made during it counts from when the
+  transfer ends (an error up to the length of the transfer). When you return to the stream, a device copy is sent only if the host clipboard has not
   changed since you made it; otherwise it is not sent (now or later) and the host's newer content is
   put on the device clipboard the next time you leave. When you leave, host content is put on the
   device clipboard only if it changed after your latest device copy, even if that copy could not be
@@ -328,6 +330,11 @@ Turn it on in Settings → Advanced, then choose **Performance overlay: metrics 
   seen. Host content Hermit itself put on the device clipboard does not count as a device copy. On
   Android 7 and earlier, which has no copy times, a device copy is always sent, and host content
   found before a device copy was sent is not put over it.
+- When sync could not be set up at stream start (the host was not ready or could not be reached,
+  for example) and is set up later, Hermit cannot tell whether the host's clipboard changed in
+  between, so the host's content counts as a change found then: what you copied on the device before
+  is not sent (Android 8.0 and later), and the host's content is put on the device clipboard the next
+  time you leave. Copy again to send yours.
 - Content already exchanged is not sent again, so Android's "pasted from clipboard" notice appears only
   for new content.
 - The host grants reading its clipboard and setting it separately (in Shell: **Clipboard Read** and

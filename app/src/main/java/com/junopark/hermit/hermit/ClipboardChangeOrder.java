@@ -11,8 +11,11 @@ package com.junopark.hermit.hermit;
  *   gets focus again, but the timestamp says when it was made. Clips Hermit put on the device
  *   clipboard itself are not device copies;
  * - a host change (a new host clipboard sequence number; for text-only hosts, new text) at the
- *   time a poll first found it: at most a poll interval (and the request) after it was made;
- * - a device clip sent to the host takes the time of its clip timestamp.
+ *   time the request of the poll that first found it was issued: at most a poll interval after it
+ *   was made, or as long as a transfer in progress (a poll waits behind it on the worker);
+ * - a device clip sent to the host takes the time of its clip timestamp;
+ * - host content found when sync is set up is not a change only at stream start; a setup that
+ *   succeeds later takes it for a host change found then (hostSetUp).
  *
  * So:
  * - a device clip is sent only while no host change was found after it (deviceMayReplaceHost);
@@ -51,9 +54,31 @@ final class ClipboardChangeOrder {
     }
 
     /**
-     * A poll at time now found host content key (its clipboard sequence number, or for text-only
-     * hosts its text), the latest device copy having been made at latestDeviceCopy. FETCH also
-     * takes the content: call hostRetry when it could not be fetched in a way that may pass.
+     * Sync was set up and found host content key with a request issued at time now. Only the
+     * setup at stream start records it as the host's content before the stream (hostRecorded). A
+     * setup that failed then and succeeds later cannot tell whether the host's clipboard changed
+     * in between (the user copied there during the stream), so the content is a host change found
+     * now: an older device clip (waiting to be sent since stream start) no longer replaces it, and
+     * the next poll fetches it while no newer device copy came. The trade-off: when the host did
+     * not change after all, its older content wins over that device clip, which is then not sent
+     * (copy it again).
+     */
+    void hostSetUp(String key, boolean atStart, long now) {
+        if (atStart) {
+            hostRecorded(key);
+            return;
+        }
+        hostKnown = true;
+        hostKey = key;
+        hostTime = Math.max(hostTime, now);
+        hostPending = true;
+    }
+
+    /**
+     * A poll whose request was issued at time now found host content key (its clipboard sequence
+     * number, or for text-only hosts its text), the latest device copy having been made at
+     * latestDeviceCopy. FETCH also takes the content: call hostRetry when it could not be fetched
+     * in a way that may pass.
      */
     HostContent hostSeen(String key, long now, long latestDeviceCopy) {
         if (!hostKnown || !key.equals(hostKey)) {
