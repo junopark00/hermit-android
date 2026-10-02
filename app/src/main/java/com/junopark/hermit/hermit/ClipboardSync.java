@@ -107,9 +107,13 @@ public class ClipboardSync {
     // UI thread state, persisted so a new stream does not resend what was already exchanged
     private String lastExchangedKey;
     private long lastSeenClipTimestamp;
-    // A device clip the host or this device refused for good (too large, unreadable, ...): not
-    // tried again on each return (the timestamp covers it where Android has one)
+    // A device clip this device cannot send at all (too large, unreadable, ...): not tried again
+    // on each return, nor on a later stream (the timestamp covers it where Android has one)
     private String refusedKey;
+    // A device clip this host refused (no images, over its limit): skipped for the rest of this
+    // stream only, so a later stream to another host still tries it
+    private String hostRefusedKey;
+    private long hostRefusedClipTimestamp = -1;
 
     public ClipboardSync(Activity activity, NvHTTP http) {
         this.activity = activity;
@@ -165,7 +169,7 @@ public class ClipboardSync {
             return;
         }
         long timestamp = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ? description.getTimestamp() : -1;
-        if (timestamp > 0 && timestamp == lastSeenClipTimestamp) {
+        if (timestamp > 0 && (timestamp == lastSeenClipTimestamp || timestamp == hostRefusedClipTimestamp)) {
             return;
         }
 
@@ -193,6 +197,10 @@ public class ClipboardSync {
                 rememberSeen(timestamp);
                 return;
             }
+            if (key.equals(hostRefusedKey)) {
+                hostRefusedClipTimestamp = timestamp;
+                return;
+            }
             final String mime = appContext.getContentResolver().getType(uri);
             handler.post(() -> pushImage(uri, mime, key, timestamp));
             return;
@@ -215,6 +223,10 @@ public class ClipboardSync {
             rememberSeen(timestamp);
             return; // our own copy of host content, or text already sent (or refused)
         }
+        if (key.equals(hostRefusedKey)) {
+            hostRefusedClipTimestamp = timestamp;
+            return;
+        }
         handler.post(() -> pushText(value, key, timestamp));
     }
 
@@ -227,13 +239,24 @@ public class ClipboardSync {
     }
 
     /**
-     * Worker thread: a device clip was refused for good (too large, unreadable, or an image for a
-     * host without images): it is not sent again on the next return to the stream.
+     * Worker thread: a device clip cannot be sent at all (too large, unreadable): it is not sent
+     * again on the next return to the stream, nor on a later stream.
      */
     private void markRefused(String key, long timestamp) {
         activity.runOnUiThread(() -> {
             refusedKey = key;
             rememberSeen(timestamp);
+        });
+    }
+
+    /**
+     * Worker thread: this host refused a device clip (no images, over its limit): it is not sent
+     * again during this stream, but a later stream (maybe to another host) tries it.
+     */
+    private void markRefusedByHost(String key, long timestamp) {
+        activity.runOnUiThread(() -> {
+            hostRefusedKey = key;
+            hostRefusedClipTimestamp = timestamp;
         });
     }
 
@@ -548,7 +571,7 @@ public class ClipboardSync {
         if (mode != Mode.EXTENDED) {
             HermitLog.info("Clipboard images need a Shell host; only text is synced");
             reportSendFailure(key, R.string.hermit_clipboard_images_need_shell);
-            markRefused(key, timestamp);
+            markRefusedByHost(key, timestamp);
             return;
         }
         byte[] png;
@@ -650,9 +673,9 @@ public class ClipboardSync {
                 HermitLog.info("Clipboard sync: host has no clipboard endpoint");
                 return;
             case 413:
-                // Larger than the host takes (Shell: 32 MB or 8192x8192 pixels for an image)
+                // Larger than this host takes (Shell: 32 MB or 8192x8192 pixels for an image)
                 reportSendFailure(key, R.string.hermit_clipboard_too_large);
-                markRefused(key, timestamp);
+                markRefusedByHost(key, timestamp);
                 return;
             case 400:
                 if (image && modeAssumed) {
@@ -660,7 +683,7 @@ public class ClipboardSync {
                     mode = Mode.LEGACY;
                     modeAssumed = false;
                     reportSendFailure(key, R.string.hermit_clipboard_images_need_shell);
-                    markRefused(key, timestamp);
+                    markRefusedByHost(key, timestamp);
                     return;
                 }
                 break;

@@ -292,10 +292,12 @@ Turn it on in Settings → Advanced, then choose **Performance overlay: metrics 
 - **Files are not synced** in either direction: copying a file on the device or on the host shows a
   notice once per stream, and an older text or image is not pasted in its place. Only text and images
   are synced.
-- Content that could not be sent (a network error, or a host that is not ready yet) is retried the
-  next time you return to the stream, with a notice once per item. Content that can never be sent (too
-  large, unreadable, or an image for a host without image support) is not retried until you copy
-  something else.
+- Content that could not be sent (a network error, a host that is not ready yet, or a host clipboard
+  that was busy) is retried the next time you return to the stream, with a notice once per item.
+  Content that can never be sent (too large, unreadable) is not retried until you copy something
+  else. Content the host refused (an image for a host without image support, or more than the host
+  takes) is not retried during that stream; a later stream, for example to another host, tries it
+  again.
 - Host content too large to bring to the device (for example a huge image) is skipped with a notice
   once, and the older host content is not put on the device clipboard instead.
 - Android only lets the visible app read the clipboard, and leaving the app ends the stream. Hermit
