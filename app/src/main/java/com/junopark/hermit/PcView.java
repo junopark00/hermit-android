@@ -90,8 +90,9 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     // Held while a cancelled attempt is withdrawn; a newer attempt takes it before it asks the host
     // to pair, so the withdrawal (same uniqueid) can't reach the host after it and drop it
     private static final Object pairingWithdrawLock = new Object();
-    // Shell closes a pairing request that got no PIN after 300 s; a connection error after this
-    // long, while getservercert still waits for its answer, means the PIN window ran out
+    // Shell closes a pairing request that got no PIN after 300 s, and Hermit stops waiting at 295 s
+    // (NvHTTP); a connection error after this long, while getservercert still waits for its
+    // answer, means the PIN window ran out
     private static final long PAIRING_PIN_WINDOW_MS = 290_000;
     // A PC paired while this activity was in the background (the Shell pairing page in the
     // browser): its app list opens from onResume(), since a background launch is blocked
@@ -530,6 +531,11 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                             && !pm.isServerCertAnswered()
                             && SystemClock.elapsedRealtime() - pairingStartedAt >= PAIRING_PIN_WINDOW_MS) {
                         message = getResources().getString(R.string.hermit_pair_pin_timeout);
+                        if (!cancelled.get()) {
+                            // Hermit gave up just before the host does: a PIN entered in between
+                            // must not reach the abandoned attempt (Cancel already withdrew it)
+                            withdrawPairing(computer, uniqueId, generation);
+                        }
                     }
                 }
 

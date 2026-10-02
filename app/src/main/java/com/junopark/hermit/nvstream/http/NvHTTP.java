@@ -80,6 +80,9 @@ public class NvHTTP {
     public static final int SHORT_CONNECTION_TIMEOUT = 3000;
     public static final int LONG_CONNECTION_TIMEOUT = 5000;
     public static final int READ_TIMEOUT = 7000;
+    // Hermit: how long getservercert waits for the PIN; just under Shell's 300 s, so this side
+    // gives up first instead of finding the connection closed
+    private static final int PAIRING_PIN_TIMEOUT = 295_000;
 
     // Print URL and content to logcat on debug builds
     private static boolean verbose = BuildConfig.DEBUG;
@@ -91,6 +94,7 @@ public class NvHTTP {
     private OkHttpClient httpClientLongConnectTimeout;
     private OkHttpClient httpClientLongConnectNoReadTimeout;
     private OkHttpClient httpClientShortConnectTimeout;
+    private OkHttpClient httpClientPairingPinWait;
 
     private X509TrustManager defaultTrustManager;
     private X509TrustManager trustManager;
@@ -198,6 +202,14 @@ public class NvHTTP {
 
         httpClientLongConnectNoReadTimeout = httpClientLongConnectTimeout.newBuilder()
                 .readTimeout(0, TimeUnit.MILLISECONDS)
+                .build();
+
+        // Hermit: for getservercert. No silent resend either: OkHttp retries a request whose
+        // connection closed without a response on the host's next address, which would start a new
+        // pairing attempt (and PIN window) behind the user's back
+        httpClientPairingPinWait = httpClientLongConnectTimeout.newBuilder()
+                .readTimeout(PAIRING_PIN_TIMEOUT, TimeUnit.MILLISECONDS)
+                .retryOnConnectionFailure(false)
                 .build();
     }
 
@@ -734,7 +746,7 @@ public class NvHTTP {
     }
 
     String executePairingCommand(String additionalArguments, boolean enableReadTimeout) throws HostHttpResponseException, IOException {
-        return openHttpConnectionToString(enableReadTimeout ? httpClientLongConnectTimeout : httpClientLongConnectNoReadTimeout,
+        return openHttpConnectionToString(enableReadTimeout ? httpClientLongConnectTimeout : httpClientPairingPinWait,
                 baseUrlHttp, "pair", "devicename=roth&updateState=1&" + additionalArguments);
     }
 
