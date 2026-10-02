@@ -61,6 +61,9 @@ public class ClipboardSync {
     private static final long MAX_HOST_IMAGE_PIXELS = 8192L * 8192;  // Shell answers 413 above it
     // Failed fetches of one host clipboard item before it is given up on
     private static final int MAX_HOST_FETCH_FAILURES = 3;
+    // The same for a host image (up to 32 MB each time): fetched once more at most, as in Hermit
+    // for Windows
+    private static final int MAX_HOST_IMAGE_FETCH_FAILURES = 2;
     // Busy answers (503) in a row for one host clipboard item before each further one counts as
     // a failed fetch
     private static final int MAX_HOST_BUSY_ANSWERS = 10;
@@ -130,6 +133,8 @@ public class ClipboardSync {
     // The device image the host last answered 500 for, and how often
     private String serverErrorKey;
     private int serverErrors;
+    // The device image whose send last failed with a network error: sent once more at most
+    private String networkErrorKey;
     // A device clip that arrived before the host accepted clipboard calls (e.g. 403 right
     // after the stream started); sent once setup succeeds.
     private Runnable deferredPush;
@@ -335,8 +340,9 @@ public class ClipboardSync {
     }
 
     /**
-     * Worker thread: a device clip cannot be sent at all (too large, unreadable): it is not sent
-     * again on the next return to the stream, nor on a later stream.
+     * Worker thread: a device clip cannot be sent at all (too large, unreadable), or an image
+     * failed with a network error twice: it is not sent again on the next return to the stream,
+     * nor on a later stream, until something else is copied.
      */
     private void markRefused(String key, long timestamp) {
         activity.runOnUiThread(() -> {
@@ -597,8 +603,10 @@ public class ClipboardSync {
         // The host clipboard changed: whatever was fetched before is no longer what the user
         // copied there last, so it is replaced, or dropped when nothing usable comes back.
         // A fetch that failed on the way is tried again on the next poll (hostRetry) unless the
-        // user copied something on the device since: after a network hiccup a few times at most
-        // (hostFetchFailed), while the host clipboard is busy (503) for a while longer (hostBusy).
+        // user copied something on the device since: after a network hiccup a few times at most,
+        // an image once more (hostFetchFailed), while the host clipboard is busy (503) for a
+        // while longer (hostBusy).
+        boolean image = "image".equals(type);
         HostContent content = null;
         File imageFile = null;
         try {
@@ -608,7 +616,7 @@ public class ClipboardSync {
                     String text = new String(data, StandardCharsets.UTF_8);
                     content = new HostContent(text, null, textKey(text), order.hostTime());
                 }
-            } else if ("image".equals(type)) {
+            } else if (image) {
                 byte[] png = http.hermitGetClipboard("image", MAX_IMAGE_BYTES);
                 if (png.length > 0) {
                     String name = "host-" + System.currentTimeMillis() + "-" + seq + ".png";
@@ -643,14 +651,14 @@ public class ClipboardSync {
                     }
                     break;
                 case 503:
-                    hostBusy(seq, e);
+                    hostBusy(seq, image, e);
                     return;
                 default:
                     break;
             }
             hostBusyAnswers = 0;
             if (e.getErrorCode() != 401 && e.getErrorCode() != 404) {
-                hostFetchFailed(seq, e); // 401 and 404 stop polling instead
+                hostFetchFailed(seq, image, e); // 401 and 404 stop polling instead
             }
             throw e;
         } catch (IOException e) {
@@ -661,7 +669,7 @@ public class ClipboardSync {
                 //noinspection ResultOfMethodCallIgnored
                 imageFile.delete();
             }
-            hostFetchFailed(seq, e);
+            hostFetchFailed(seq, image, e);
             throw e;
         }
         pending = content;
@@ -669,17 +677,18 @@ public class ClipboardSync {
 
     /**
      * Fetching host clipboard item seq failed. A timeout (the host taking too long to encode a
-     * large image) or a third failure in a row gives up on it until the host clipboard changes
-     * again, instead of fetching it (and the host encoding it) every second for the rest of the
-     * stream. Otherwise it is fetched again on the next poll.
+     * large image) or a third failure in a row (for an image, a second) gives up on it until the
+     * host clipboard changes again, instead of fetching it (and the host encoding it) every
+     * second for the rest of the stream. Otherwise it is fetched again on the next poll.
      */
-    private void hostFetchFailed(long seq, IOException e) {
+    private void hostFetchFailed(long seq, boolean image, IOException e) {
         if (seq != failedHostSeq) {
             failedHostSeq = seq;
             hostFetchFailures = 0;
         }
         hostFetchFailures++;
-        if (!(e instanceof SocketTimeoutException) && hostFetchFailures < MAX_HOST_FETCH_FAILURES) {
+        int maxFailures = image ? MAX_HOST_IMAGE_FETCH_FAILURES : MAX_HOST_FETCH_FAILURES;
+        if (!(e instanceof SocketTimeoutException) && hostFetchFailures < maxFailures) {
             order.hostRetry(seqKey(seq));
             return;
         }
@@ -698,7 +707,7 @@ public class ClipboardSync {
      * counts as a failed fetch, so the item is given up on (hostFetchFailed) instead of fetched
      * every second for the rest of the stream.
      */
-    private void hostBusy(long seq, HostHttpResponseException e) {
+    private void hostBusy(long seq, boolean image, HostHttpResponseException e) {
         if (seq != busyHostSeq) {
             busyHostSeq = seq;
             hostBusyAnswers = 0;
@@ -707,7 +716,7 @@ public class ClipboardSync {
             HermitLog.info("Clipboard: the host clipboard is busy; fetching it again");
         }
         if (++hostBusyAnswers > MAX_HOST_BUSY_ANSWERS) {
-            hostFetchFailed(seq, e);
+            hostFetchFailed(seq, image, e);
         } else {
             order.hostRetry(seqKey(seq));
         }
@@ -876,9 +885,23 @@ public class ClipboardSync {
         } catch (HostHttpResponseException e) {
             handleSendError(e, key, timestamp, true);
         } catch (IOException e) {
-            HermitLog.warning("Clipboard image not sent: " + e);
-            reportSendFailure(key, R.string.hermit_clipboard_send_failed); // tried again next time
-            markNotSent(key);
+            // A network error (a timeout, a connection refused or reset, an upload cut off) may
+            // be passing: sent once more on the next return, unless the host clipboard changes
+            // first. After a second one it is not sent again until it is copied again, rather
+            // than read again (Android's paste notice) and uploaded again (up to 32 MB) on every
+            // return, as in Hermit for Windows. The stream ending (stop() aborts the send) is not
+            // such an error: the image stays unsent for a later stream.
+            if (stopped) {
+                markNotSent(key);
+            } else if (!key.equals(networkErrorKey)) {
+                networkErrorKey = key;
+                HermitLog.warning("Clipboard image not sent: " + e);
+                reportSendFailure(key, R.string.hermit_clipboard_send_failed); // tried again next time
+                markNotSent(key);
+            } else {
+                HermitLog.warning("Clipboard image not sent again: " + e + "; not sent again until it is copied again");
+                markRefused(key, timestamp);
+            }
         }
     }
 

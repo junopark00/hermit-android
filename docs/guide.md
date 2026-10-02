@@ -292,7 +292,9 @@ Turn it on in Settings → Advanced, then choose **Performance overlay: metrics 
 ## Clipboard sync
 
 - Returning to the stream sends what you copied on the device to the host; leaving the stream puts
-  what you copied on the host on the device clipboard (the same rules as Hermit for Windows).
+  what you copied on the host on the device clipboard. When both changed, the most recent change wins,
+  as in Hermit for Windows; how often content that failed is tried again differs in some details,
+  described below.
 - Text works with Shell and other hosts that offer the same clipboard extension (for example Apollo).
   **Images (Shell)** are synced too: JPEG and WebP images from the device are converted to PNG (photos
   above 16 megapixels are halved to avoid running out of memory, and photos are turned upright on
@@ -307,11 +309,15 @@ Turn it on in Settings → Advanced, then choose **Performance overlay: metrics 
   else. Content the host refused (an image for a host without image support, or more than the host
   takes) is not retried during that stream; a later stream, for example to another host, tries it
   again. The same goes for a device image the host fails to set (HTTP 500) twice.
+- A device image that a network error stopped (a timeout included) is sent once more the next time
+  you return to the stream; if that fails too, it is not sent again (nor read again, with Android's
+  paste notice) until you copy something else: copy it again to send it. Text is retried on every
+  return.
 - Host content too large to bring to the device (for example a huge image) is skipped with a notice
   once, and the older host content is not put on the device clipboard instead. The same goes for a
   host image the host could not convert to PNG: a notice says so once.
-- Host content that fails to arrive three times, or times out once, is given up until the host
-  clipboard changes again, with a notice once per stream.
+- Host content that fails to arrive three times (an image twice: it is fetched once more), or times
+  out once, is given up until the host clipboard changes again, with a notice once per stream.
 - While the host clipboard is busy (another program holding it open), Hermit fetches the host content
   again on the next check, and content sent from the device is retried on your next return to the
   stream. A host clipboard that stays busy for more than about ten seconds counts as a failed fetch.
