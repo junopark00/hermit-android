@@ -171,6 +171,10 @@ public class ClipboardSync {
         }
         if (thread != null) {
             thread.quitSafely();
+            // A send can wait minutes for the host's reply: abort it rather than leave the worker
+            // (and the image) behind. This NvHTTP is ours alone; not on the UI thread, as the
+            // cancel closes sockets.
+            new Thread(http::cancelPendingRequests, "Hermit clipboard stop").start();
         }
     }
 

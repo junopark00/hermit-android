@@ -83,6 +83,11 @@ public class NvHTTP {
     // Hermit: how long getservercert waits for the PIN; just under Shell's 300 s, so this side
     // gives up first instead of finding the connection closed
     private static final int PAIRING_PIN_TIMEOUT = 295_000;
+    // Hermit: how long a clipboard POST waits for the reply after the last byte is sent. Shell
+    // replies only once it has set its clipboard (an image up to 8192x8192 is decoded and converted
+    // first, behind any earlier clipboard work), which can take much longer than READ_TIMEOUT.
+    // Hermit for Windows waits as long.
+    private static final int CLIPBOARD_SEND_TIMEOUT = 300_000;
 
     // Print URL and content to logcat on debug builds
     private static boolean verbose = BuildConfig.DEBUG;
@@ -95,6 +100,7 @@ public class NvHTTP {
     private OkHttpClient httpClientLongConnectNoReadTimeout;
     private OkHttpClient httpClientShortConnectTimeout;
     private OkHttpClient httpClientPairingPinWait;
+    private OkHttpClient httpClientClipboardSend;
 
     private X509TrustManager defaultTrustManager;
     private X509TrustManager trustManager;
@@ -210,6 +216,12 @@ public class NvHTTP {
         httpClientPairingPinWait = httpClientLongConnectTimeout.newBuilder()
                 .readTimeout(PAIRING_PIN_TIMEOUT, TimeUnit.MILLISECONDS)
                 .retryOnConnectionFailure(false)
+                .build();
+
+        // Hermit: for clipboard POSTs (see CLIPBOARD_SEND_TIMEOUT); shares the dispatcher, so
+        // cancelPendingRequests() aborts it too
+        httpClientClipboardSend = httpClientLongConnectTimeout.newBuilder()
+                .readTimeout(CLIPBOARD_SEND_TIMEOUT, TimeUnit.MILLISECONDS)
                 .build();
     }
 
@@ -897,10 +909,16 @@ public class NvHTTP {
                 .addQueryParameter("uuid", UUID.randomUUID().toString())
                 .build();
         Request.Builder request = new Request.Builder().url(url);
+        OkHttpClient client = httpClientLongConnectTimeout;
         if (body != null) {
             request.post(RequestBody.create(body, MediaType.parse(contentType)));
+            // The host replies only once its clipboard is set
+            client = httpClientClipboardSend;
         }
-        Response response = performAndroidTlsHack(httpClientLongConnectTimeout).newCall(request.build()).execute();
+        if (cancelled) {
+            throw new IOException("Cancelled");
+        }
+        Response response = performAndroidTlsHack(client).newCall(request.build()).execute();
         if (!response.isSuccessful()) {
             int code = response.code();
             String message = code == 422 ? firstBodyLine(response.body()) : response.message();
