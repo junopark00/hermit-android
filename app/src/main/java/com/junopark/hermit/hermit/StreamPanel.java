@@ -1072,7 +1072,7 @@ public class StreamPanel {
     // ---- Quick menu (the keypad's button) ----------------------------------------------------
 
     public boolean isTrackpad() {
-        return prefs.getBoolean(TRACKPAD, false);
+        return prefs.getBoolean(TRACKPAD, PreferenceConfiguration.DEFAULT_TOUCHSCREEN_TRACKPAD);
     }
 
     public void setTrackpad(boolean trackpad) {
@@ -1252,7 +1252,7 @@ public class StreamPanel {
         handleSideSpinner.setSelection(handleOnLeft() ? 1 : 0, false);
         orientationSpinner.setSelection(Math.max(0, Arrays.asList(ORIENTATIONS).indexOf(orientation())), false);
         clipboardSwitch.setChecked(prefs.getBoolean(HermitPreferences.CLIPBOARD_SYNC_PREF, true));
-        trackpadSwitch.setChecked(prefs.getBoolean(TRACKPAD, false));
+        trackpadSwitch.setChecked(isTrackpad());
         oscSwitch.setChecked(prefs.getBoolean(ONSCREEN_CONTROLS, false));
         zoomSwitch.setChecked(prefs.getBoolean(PINCH_ZOOM, true));
         refreshPercentSeek(trackpadSpeed, trackpadSpeedLabel, R.string.title_hermit_trackpad_speed, HermitPreferences.TRACKPAD_SPEED_PREF, 50);
