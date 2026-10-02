@@ -407,10 +407,12 @@ public class ClipboardSync {
             return;
         }
         String type = parseField(info, "type");
-        hostSeq = seq;
 
         // The host clipboard changed: whatever was fetched before is no longer what the user
         // copied there last, so it is replaced, or dropped when nothing usable comes back.
+        // hostSeq moves on once the content was fetched or is known to be unusable, so a fetch
+        // that failed on the way (a network hiccup, the host clipboard busy) is tried again on
+        // the next poll.
         HostContent content = null;
         try {
             if ("text".equals(type)) {
@@ -440,6 +442,7 @@ public class ClipboardSync {
         } catch (HostHttpResponseException e) {
             pending = null;
             if (e.getErrorCode() == 413) {
+                hostSeq = seq;
                 reportHostTooLarge();
                 return;
             }
@@ -448,6 +451,7 @@ public class ClipboardSync {
             pending = null;
             throw e;
         }
+        hostSeq = seq;
         pending = content;
     }
 
