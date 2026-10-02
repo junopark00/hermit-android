@@ -59,10 +59,21 @@ public final class ShellPairingPage {
         return name.trim();
     }
 
-    /** https://host:port/pin#pin=PIN&name=NAME (IPv6 hosts in brackets; the fragment percent-encoded). */
+    /**
+     * https://host:port/pin#pin=PIN&name=NAME (IPv6 hosts in brackets, without a zone id; the
+     * fragment percent-encoded).
+     */
     public static Uri url(ComputerDetails computer, String pin, String deviceName) {
         String host = computer.activeAddress.address;
-        if (host.contains(":") && !host.startsWith("[")) {
+        if (host.startsWith("[") && host.endsWith("]")) {
+            host = host.substring(1, host.length() - 1);
+        }
+        int zone = host.indexOf('%');
+        if (zone >= 0) {
+            // Browsers reject a link-local zone id (fe80::1%wlan0) in a URL
+            host = host.substring(0, zone);
+        }
+        if (host.contains(":")) {
             host = "[" + host + "]";
         }
         return Uri.parse("https://" + host + ":" + webUiPort(computer) + "/pin#pin=" + Uri.encode(pin)
