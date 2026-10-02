@@ -148,6 +148,10 @@ public class ClipboardSync {
     // Written by the worker, read on the UI thread
     private volatile HostContent pending;
     private final AtomicBoolean filesNoticeShown = new AtomicBoolean();
+    // Worker thread: "none" answers looked at again for the current host change number
+    private static final int MAX_NONE_CHECKS = 3;
+    private int noneChecks;
+    private long noneChecksSeq = -1;
 
     // UI thread state, persisted so a new stream does not resend what was already exchanged
     private String lastExchangedKey;
@@ -395,6 +399,7 @@ public class ClipboardSync {
     /** Any thread: files are not synced; said once per stream. */
     private void showFilesNotice() {
         if (!filesNoticeShown.getAndSet(true)) {
+            HermitLog.info("Clipboard: files are not synced on Android; telling the user");
             toast(R.string.hermit_clipboard_files_not_synced, HermitNotice.LONG);
         }
     }
@@ -599,6 +604,11 @@ public class ClipboardSync {
                 break;
         }
         String type = parseField(info, "type");
+        HermitLog.info("Clipboard: host content seq " + seq + ", type " + type);
+        if (seq != noneChecksSeq) {
+            noneChecksSeq = seq;
+            noneChecks = 0;
+        }
 
         // The host clipboard changed: whatever was fetched before is no longer what the user
         // copied there last, so it is replaced, or dropped when nothing usable comes back.
@@ -635,6 +645,12 @@ public class ClipboardSync {
             } else if ("files".equals(type)) {
                 // Nothing this device can paste, and older text must not be applied instead
                 showFilesNotice();
+            } else if (noneChecks < MAX_NONE_CHECKS) {
+                // Nothing on the host clipboard under a new change number: a program that writes it
+                // empties it first and adds its content afterwards, and an older Shell can answer
+                // in between. Look at this number again on the next polls before settling on it.
+                noneChecks++;
+                order.hostRetry(seqKey(seq));
             }
         } catch (HostHttpResponseException e) {
             pending = null;

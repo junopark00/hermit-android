@@ -20,6 +20,8 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.junopark.hermit.HermitLog;
+
 import com.junopark.hermit.R;
 
 import java.lang.ref.WeakReference;
@@ -200,8 +202,10 @@ public final class HermitNotice {
         }
         Activity current = resumed.get();
         if (current != null && !current.isFinishing() && !current.isDestroyed()) {
+            HermitLog.info("Notice on " + current.getClass().getSimpleName() + ": " + text);
             present(current, text, duration);
         } else {
+            HermitLog.info("Notice held for the next screen: " + text);
             hold(text, duration);
         }
     }
