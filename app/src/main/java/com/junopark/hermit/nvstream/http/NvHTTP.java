@@ -12,6 +12,7 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.Proxy;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -842,7 +843,9 @@ public class NvHTTP {
     // Hermit: clipboard sync with Shell (GET and POST /actions/clipboard?type=...).
     // "text" works with any host with the clipboard endpoint; "info" and "image" are Shell extensions. HTTP errors
     // arrive as HostHttpResponseException (401 permission denied, 403 not streaming,
-    // 400 type not supported, 404 no clipboard endpoint, 413 too large).
+    // 400 type not supported, 404 no clipboard endpoint, 413 too large, 422 content the host
+    // cannot hand over, 503 host clipboard busy). For a 422 the error message is the first line
+    // of Shell's body, which says why (e.g. "image-not-convertible").
     private Response hermitClipboardCall(String type, byte[] body, String contentType) throws IOException {
         HttpUrl url = getHttpsUrl(true).newBuilder()
                 .addPathSegments("actions/clipboard")
@@ -857,11 +860,31 @@ public class NvHTTP {
         Response response = performAndroidTlsHack(httpClientLongConnectTimeout).newCall(request.build()).execute();
         if (!response.isSuccessful()) {
             int code = response.code();
-            String message = response.message();
+            String message = code == 422 ? firstBodyLine(response.body()) : response.message();
             response.close();
             throw new HostHttpResponseException(code, message);
         }
         return response;
+    }
+
+    /** The first line of a short error body (at most 256 bytes are read), or "" if there is none. */
+    private static String firstBodyLine(ResponseBody body) {
+        if (body == null) {
+            return "";
+        }
+        byte[] buffer = new byte[256];
+        int length = 0;
+        try (InputStream in = body.byteStream()) {
+            int n;
+            while (length < buffer.length && (n = in.read(buffer, length, buffer.length - length)) > 0) {
+                length += n;
+            }
+        } catch (IOException e) {
+            return "";
+        }
+        String text = new String(buffer, 0, length, StandardCharsets.UTF_8);
+        int end = text.indexOf('\n');
+        return (end >= 0 ? text.substring(0, end) : text).trim();
     }
 
     public byte[] hermitGetClipboard(String type, int maxBytes) throws IOException {

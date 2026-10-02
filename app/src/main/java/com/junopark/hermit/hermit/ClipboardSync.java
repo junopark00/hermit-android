@@ -56,6 +56,11 @@ public class ClipboardSync {
     private static final long MAX_HOST_IMAGE_PIXELS = 8192L * 8192;  // Shell answers 413 above it
     // Failed fetches of one host clipboard item before it is given up on
     private static final int MAX_HOST_FETCH_FAILURES = 3;
+    // Busy answers (503) in a row for one host clipboard item before each further one counts as
+    // a failed fetch
+    private static final int MAX_HOST_BUSY_ANSWERS = 10;
+    // First line of Shell's 422 body when it could not convert its clipboard image to PNG
+    private static final String IMAGE_NOT_CONVERTIBLE = "image-not-convertible";
     // HTTP 500s for one device image before this host is taken to refuse it
     private static final int MAX_IMAGE_SERVER_ERRORS = 2;
     private static final byte[] PNG_SIGNATURE = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
@@ -105,6 +110,10 @@ public class ClipboardSync {
     private long failedHostSeq = -1;
     private int hostFetchFailures;
     private boolean reportedHostFetchFailed;
+    // The host clipboard item (seq) the host answered busy (503) for, and how often in a row
+    private long busyHostSeq = -1;
+    private int hostBusyAnswers;
+    private boolean reportedHostImageNotConvertible;
     // The clip whose failure was last reported: one notice per clip, not one per return
     private String failureReportedKey;
     // The device image the host last answered 500 for, and how often
@@ -473,8 +482,9 @@ public class ClipboardSync {
         // The host clipboard changed: whatever was fetched before is no longer what the user
         // copied there last, so it is replaced, or dropped when nothing usable comes back.
         // hostSeq moves on once the content was fetched or is known to be unusable, so a fetch
-        // that failed on the way (a network hiccup, the host clipboard busy) is tried again on
-        // the next poll, a few times at most (hostFetchFailed).
+        // that failed on the way is tried again on the next poll: after a network hiccup a few
+        // times at most (hostFetchFailed), while the host clipboard is busy (503) for a while
+        // longer (hostBusy).
         HostContent content = null;
         File imageFile = null;
         try {
@@ -505,17 +515,34 @@ public class ClipboardSync {
             }
         } catch (HostHttpResponseException e) {
             pending = null;
-            if (e.getErrorCode() == 413) {
-                hostSeq = seq;
-                reportHostTooLarge();
-                return;
+            switch (e.getErrorCode()) {
+                case 413:
+                    hostSeq = seq;
+                    reportHostTooLarge();
+                    return;
+                case 422:
+                    if (IMAGE_NOT_CONVERTIBLE.equals(e.getErrorMessage())) {
+                        // Fails the same way however often it is fetched: drop it
+                        HermitLog.warning("Clipboard: the host could not convert its clipboard image");
+                        hostSeq = seq;
+                        reportHostImageNotConvertible();
+                        return;
+                    }
+                    break;
+                case 503:
+                    hostBusy(seq, e);
+                    return;
+                default:
+                    break;
             }
+            hostBusyAnswers = 0;
             if (e.getErrorCode() != 401 && e.getErrorCode() != 404) {
                 hostFetchFailed(seq, e); // 401 and 404 stop polling instead
             }
             throw e;
         } catch (IOException e) {
             pending = null;
+            hostBusyAnswers = 0;
             if (imageFile != null) {
                 // Partly written (storage full, ...): nothing points at it
                 //noinspection ResultOfMethodCallIgnored
@@ -549,6 +576,26 @@ public class ClipboardSync {
         if (!reportedHostFetchFailed) {
             reportedHostFetchFailed = true;
             toast(R.string.hermit_clipboard_host_fetch_failed, HermitNotice.LONG);
+        }
+    }
+
+    /**
+     * The host clipboard was busy (another program holding it open) while item seq was fetched.
+     * It is fetched again on the next poll without counting as a failure, unless the host stays
+     * busy for more than MAX_HOST_BUSY_ANSWERS polls in a row: from then on each busy answer
+     * counts as a failed fetch, so the item is given up on (hostFetchFailed) instead of fetched
+     * every second for the rest of the stream.
+     */
+    private void hostBusy(long seq, HostHttpResponseException e) {
+        if (seq != busyHostSeq) {
+            busyHostSeq = seq;
+            hostBusyAnswers = 0;
+        }
+        if (hostBusyAnswers == 0) {
+            HermitLog.info("Clipboard: the host clipboard is busy; fetching it again");
+        }
+        if (++hostBusyAnswers > MAX_HOST_BUSY_ANSWERS) {
+            hostFetchFailed(seq, e);
         }
     }
 
@@ -599,6 +646,13 @@ public class ClipboardSync {
         if (!reportedHostTooLarge) {
             reportedHostTooLarge = true;
             toast(R.string.hermit_clipboard_host_too_large, HermitNotice.LONG);
+        }
+    }
+
+    private void reportHostImageNotConvertible() {
+        if (!reportedHostImageNotConvertible) {
+            reportedHostImageNotConvertible = true;
+            toast(R.string.hermit_clipboard_host_image_not_convertible, HermitNotice.LONG);
         }
     }
 
@@ -727,6 +781,10 @@ public class ClipboardSync {
                 mode = Mode.DISABLED;
                 HermitLog.info("Clipboard sync: host has no clipboard endpoint");
                 return false;
+            case 503:
+                // The host clipboard is busy (another program holding it open): the next poll
+                // asks again, so it is not reported every second
+                return true;
             default:
                 // 413 is handled where content is fetched; a legacy host would report anything
                 // else on every poll, so it is only logged
@@ -785,11 +843,15 @@ public class ClipboardSync {
                     }
                 }
                 break;
+            case 503:
+                // The host clipboard is busy (another program holding it open): not refused and
+                // not counted as an error of this image, only tried again on the next return
+                break;
             default:
                 break;
         }
-        // Anything else (403 while the host sets up the stream, 500 when the host clipboard was
-        // busy or the first time an image could not be set, ...): said once for this clip and
+        // Anything else (403 while the host sets up the stream, 503 while the host clipboard is
+        // busy, 500 the first time an image could not be set, ...): said once for this clip and
         // tried again on the next return to the stream
         reportSendFailure(key, R.string.hermit_clipboard_send_failed);
         markNotSent(key);

@@ -299,7 +299,11 @@ Turn it on in Settings → Advanced, then choose **Performance overlay: metrics 
   takes) is not retried during that stream; a later stream, for example to another host, tries it
   again.
 - Host content too large to bring to the device (for example a huge image) is skipped with a notice
-  once, and the older host content is not put on the device clipboard instead.
+  once, and the older host content is not put on the device clipboard instead. The same goes for a
+  host image the host could not convert to PNG: a notice says so once.
+- While the host clipboard is busy (another program holding it open), Hermit fetches the host content
+  again on the next check, and content sent from the device is retried on your next return to the
+  stream. A host clipboard that stays busy for more than about ten seconds counts as a failed fetch.
 - Android only lets the visible app read the clipboard, and leaving the app ends the stream. Hermit
   therefore checks the host clipboard's change counter once a second while streaming, fetches changes
   ahead of time and puts them on the device clipboard the moment you leave.
