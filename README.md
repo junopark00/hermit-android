@@ -41,6 +41,10 @@ rely on Shell's extensions are marked below.
   orientation and input instantly; change the bitrate live without reconnecting (Shell), or apply
   resolution, frame rate, codec and HDR with a quick reconnect.
 - **Automatic bitrate** that follows frame loss and round-trip time (Shell).
+- **Resolutions that fit the screen**: besides the 16:9 sizes, the resolution lists offer 720p,
+  1080p, 1440p and (where 4K is supported) 2160p sizes in this device's own aspect ratio, for
+  example 1600×720 and 3200×1440 on a 20:9 phone or 1728×1080 on a 16:10 tablet, so the picture
+  fills the screen without typing a custom size.
 - **Pinch zoom** of the stream on the device, up to 500%, with accurate touch on the zoomed picture.
 - **Screen orientation**: automatic from the stream's shape, or locked to landscape or portrait.
 - **Performance overlay** with selectable metrics, including estimated end-to-end latency and the

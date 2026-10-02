@@ -97,6 +97,8 @@
     <string name="hermit_panel_section_picture">PICTURE AND QUALITY</string>
     <string name="hermit_panel_reconnect_note">Applied by reconnecting: the picture pauses for 2 to 3 seconds and the host app keeps running.</string>
     <string name="hermit_panel_resolution">Resolution</string>
+    <string name="hermit_resolution_screen_aspect">%1$d×%2$d (screen aspect)</string>
+    <string name="hermit_resolution_screen_aspect_portrait">%1$d×%2$d (screen aspect, portrait)</string>
     <string name="hermit_panel_resolution_hint">Other size: width x height, e.g. %1$s</string>
     <string name="hermit_panel_resolution_error">Enter width x height (320x240 to 7680x4320)</string>
     <string name="hermit_panel_bitrate_error">Enter 0.5 to 150 Mbps</string>

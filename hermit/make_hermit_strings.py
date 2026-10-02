@@ -261,6 +261,8 @@ hermit = [
     ('hermit_panel_reconnect_note', 'Applied by reconnecting: the picture pauses for 2 to 3 seconds and the host app keeps running.',
      '다시 연결해 적용합니다. 화면이 2~3초 멈추고, 호스트의 앱은 계속 실행됩니다.'),
     ('hermit_panel_resolution', 'Resolution', '해상도'),
+    ('hermit_resolution_screen_aspect', '%1$d×%2$d (screen aspect)', '%1$d×%2$d (화면 비율)'),
+    ('hermit_resolution_screen_aspect_portrait', '%1$d×%2$d (screen aspect, portrait)', '%1$d×%2$d (화면 비율, 세로)'),
     ('hermit_panel_resolution_hint', 'Other size: width x height, e.g. %1$s', '직접 입력: 가로x세로 (예: %1$s)'),
     ('hermit_panel_resolution_error', 'Enter width x height (320x240 to 7680x4320)', '가로x세로로 입력하세요 (320x240~7680x4320)'),
     ('hermit_panel_bitrate_error', 'Enter 0.5 to 150 Mbps', '0.5~150 Mbps 사이로 입력하세요'),

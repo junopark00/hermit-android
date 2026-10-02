@@ -15,6 +15,7 @@ extensions that only Shell provides; they are marked **(Shell)** below.
 - [Text input bar](#text-input-bar)
 - [Virtual keypad](#virtual-keypad)
 - [Stream settings panel](#stream-settings-panel)
+- [Resolutions in the screen's aspect ratio](#resolutions-in-the-screens-aspect-ratio)
 - [Automatic bitrate (Shell)](#automatic-bitrate-shell)
 - [Bitrate input and recommended bitrate](#bitrate-input-and-recommended-bitrate)
 - [Performance overlay](#performance-overlay)
@@ -177,14 +178,37 @@ the screen edge opens it too.
   (**Revert** sends the reverted value as well). If a change fails after the panel was closed, a
   notice is shown once.
 - **Applied by reconnecting:** resolution (from the list or typed as `WIDTHxHEIGHT`), frame rate,
-  codec and HDR. The list includes this device's own screen size. On devices locked to landscape,
-  portrait resolutions are left out, and 4K, 90/120 FPS and HDR are offered only when the screen and
-  decoder support them (the same rules as the settings screen). Out-of-range values (320x240 to
-  7680x4320, 0.5 to 150 Mbps) are flagged in the field. **Apply and reconnect** continues with the new
+  codec and HDR. The list includes this device's own screen size and
+  [sizes in its aspect ratio](#resolutions-in-the-screens-aspect-ratio). On devices locked to
+  landscape, portrait resolutions are left out, and 4K, 90/120 FPS and HDR are offered only when the
+  screen and decoder support them (the same rules as the settings screen). Out-of-range values
+  (320x240 to 7680x4320, 0.5 to 150 Mbps) are flagged in the field. **Apply and reconnect** continues with the new
   settings after about 2–3 seconds; the app on the host keeps running.
 - **Quit app and disconnect** asks for confirmation, then quits the app on the host and ends the
   stream.
 - Values changed in the panel are the same settings as in the settings screen and are saved.
+
+## Resolutions in the screen's aspect ratio
+
+Most phones are not 16:9 (19.5:9 and 20:9 are common) and many tablets are 16:10, 3:2 or 4:3, so a
+16:9 stream leaves bars at the sides. Besides the standard sizes and the device's own screen size,
+the resolution lists in Settings and in the stream panel offer sizes in the screen's aspect ratio,
+labelled **(screen aspect)**:
+
+- The ratio is the long side divided by the short side of the full display. For heights 720, 1080,
+  1440 and 2160 the width is the height times that ratio, rounded to an even number (to a multiple
+  of 8 when the ratio stays within 1%).
+- Examples: a 2400×1080 (20:9) phone gets 1600×720 and 3200×1440 (2400×1080 is already its native
+  size); a 2560×1600 (16:10) tablet gets 1152×720, 1728×1080 and 2304×1440, plus 3456×2160 where 4K
+  is offered.
+- The same limits as the standard sizes apply: the 2160 size only where 4K is offered, 1440 and 1080
+  only where those sizes are, and no size the video decoder reports it cannot decode. A size equal to
+  a standard size or to the native size is not listed twice.
+- On squarish screens (such as the inner screen of a foldable), which may stream in portrait, the 720
+  and 1080 sizes are also offered in portrait.
+- As with the native size, the host needs a matching display mode; hosts that stream from a virtual
+  display adapt to any size. The recommended bitrate (and, in Settings, the default bitrate) follows
+  the chosen size.
 
 ## Automatic bitrate (Shell)
 

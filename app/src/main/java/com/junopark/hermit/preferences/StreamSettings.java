@@ -31,11 +31,14 @@ import com.junopark.hermit.HermitLog;
 import com.junopark.hermit.PcView;
 import com.junopark.hermit.R;
 import com.junopark.hermit.binding.video.MediaCodecHelper;
+import com.junopark.hermit.hermit.AspectPresets;
 import com.junopark.hermit.utils.Dialog;
 import com.junopark.hermit.utils.UiHelper;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class StreamSettings extends Activity {
     private PreferenceConfiguration previousPrefs;
@@ -187,6 +190,46 @@ public class StreamSettings extends Activity {
                 addNativeResolutionEntry(nativeHeight, nativeWidth, insetsRemoved, true);
             }
             addNativeResolutionEntry(nativeWidth, nativeHeight, insetsRemoved, false);
+        }
+
+        // Hermit: presets in the screen's aspect ratio, between the standard sizes and the native
+        // ones. Heights follow the standard sizes the capability filters kept (2160 only while 4K
+        // is offered, and so on). Like the native sizes, picking one shows the warning dialog.
+        private void addScreenAspectEntries(Display display, boolean checkDecoders) {
+            ListPreference pref = (ListPreference) findPreference(PreferenceConfiguration.RESOLUTION_PREF_STRING);
+            List<String> values = new ArrayList<>();
+            List<CharSequence> entries = new ArrayList<>(Arrays.asList(pref.getEntries()));
+            for (CharSequence value : pref.getEntryValues()) {
+                values.add(value.toString());
+            }
+
+            int maxHeight = values.contains(PreferenceConfiguration.RES_4K) ? 2160 :
+                    values.contains(PreferenceConfiguration.RES_1440P) ? 1440 :
+                    values.contains(PreferenceConfiguration.RES_1080P) ? 1080 : 720;
+
+            // Right after the last standard size
+            List<String> standard = Arrays.asList(getResources().getStringArray(R.array.resolution_values));
+            int insertAt = 0;
+            for (int i = 0; i < values.size(); i++) {
+                if (standard.contains(values.get(i))) {
+                    insertAt = i + 1;
+                }
+            }
+
+            int index = insertAt;
+            for (AspectPresets.Preset preset : AspectPresets.forDisplay(display, maxHeight, checkDecoders)) {
+                if (values.contains(preset.value)) {
+                    continue; // the native size, for example
+                }
+                values.add(index, preset.value);
+                entries.add(index, preset.label(getActivity()));
+                index++;
+            }
+
+            // Everything after the standard sizes is the screen's own (native or aspect) size
+            nativeResolutionStartIndex = insertAt;
+            pref.setEntries(entries.toArray(new CharSequence[0]));
+            pref.setEntryValues(values.toArray(new CharSequence[0]));
         }
 
         private void addNativeFrameRateEntry(float framerate) {
@@ -539,6 +582,7 @@ public class StreamSettings extends Activity {
                 int height = Math.min(metrics.widthPixels, metrics.heightPixels);
                 addNativeResolutionEntries(width, height, false);
             }
+            addScreenAspectEntries(display, Build.VERSION.SDK_INT >= Build.VERSION_CODES.M);
 
             if (!PreferenceConfiguration.readPreferences(this.getActivity()).unlockFps) {
                 // We give some extra room in case the FPS is rounded down

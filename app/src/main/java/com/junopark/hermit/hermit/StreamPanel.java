@@ -38,9 +38,11 @@ import com.junopark.hermit.preferences.PreferenceConfiguration;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -157,6 +159,10 @@ public class StreamPanel {
 
     // What this device can show
     private final List<String> resolutionPresets = new ArrayList<>();
+    // Labels of presets that are more than "WIDTHxHEIGHT" (the screen aspect sizes)
+    private final Map<String, String> resolutionLabels = new HashMap<>();
+    // The values behind the resolution spinner's rows, as last shown
+    private final List<String> shownResolutions = new ArrayList<>();
     private final List<Integer> fpsPresets = new ArrayList<>();
     private final String[] codecValues;
 
@@ -537,6 +543,24 @@ public class StreamPanel {
         if (PreferenceConfiguration.isSquarishScreen(display)) {
             resolutionPresets.addAll(Arrays.asList(PORTRAIT_PRESETS));
         }
+        // Sizes in the screen's aspect ratio (2160 only with 4K): landscape ones by width among
+        // the landscape sizes, portrait copies at the end
+        for (AspectPresets.Preset preset : AspectPresets.forDisplay(display, can4k ? 2160 : 1440, true)) {
+            if (resolutionPresets.contains(preset.value)) {
+                continue; // the native size, for example
+            }
+            resolutionLabels.put(preset.value, preset.label(activity));
+            if (preset.portrait) {
+                resolutionPresets.add(preset.value);
+                continue;
+            }
+            int i = 0;
+            while (i < resolutionPresets.size() && widthOf(resolutionPresets.get(i)) <= preset.width &&
+                    !isPortrait(resolutionPresets.get(i))) {
+                i++;
+            }
+            resolutionPresets.add(i, preset.value);
+        }
         resolutionCustom.setHint(activity.getString(R.string.hermit_panel_resolution_hint, nativeSize));
 
         // 90 and 120 FPS only on screens that refresh that fast, unless unlocked in Settings
@@ -570,6 +594,10 @@ public class StreamPanel {
         return Integer.parseInt(size.substring(0, size.indexOf('x')));
     }
 
+    private static boolean isPortrait(String size) {
+        return widthOf(size) < Integer.parseInt(size.substring(size.indexOf('x') + 1));
+    }
+
     private static boolean decoderSupportsWidth(String mimeType, int width) {
         try {
             MediaCodecInfo decoder = MediaCodecHelper.findProbableSafeDecoder(mimeType, -1);
@@ -582,7 +610,7 @@ public class StreamPanel {
 
     private void setUpStreamSettings() {
         resolutionSpinner.setOnItemSelectedListener(new SimpleSelection(position -> {
-            String value = (String) resolutionSpinner.getItemAtPosition(position);
+            String value = shownResolutions.get(position);
             prefs.edit().putString(RESOLUTION, value).apply();
             stateChanged();
         }));
@@ -1161,12 +1189,18 @@ public class StreamPanel {
         updating = true;
 
         String resolution = prefs.getString(RESOLUTION, startResolution);
-        List<String> resolutions = new ArrayList<>(resolutionPresets);
-        if (!resolutions.contains(resolution)) {
-            resolutions.add(0, resolution);
+        shownResolutions.clear();
+        shownResolutions.addAll(resolutionPresets);
+        if (!shownResolutions.contains(resolution)) {
+            shownResolutions.add(0, resolution);
         }
-        resolutionSpinner.setAdapter(adapter(resolutions));
-        resolutionSpinner.setSelection(resolutions.indexOf(resolution), false);
+        List<String> resolutionNames = new ArrayList<>();
+        for (String value : shownResolutions) {
+            String label = resolutionLabels.get(value);
+            resolutionNames.add(label != null ? label : value);
+        }
+        resolutionSpinner.setAdapter(adapter(resolutionNames));
+        resolutionSpinner.setSelection(shownResolutions.indexOf(resolution), false);
 
         int fps;
         try {
