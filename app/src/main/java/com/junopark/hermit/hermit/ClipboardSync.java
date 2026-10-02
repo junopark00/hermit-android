@@ -81,14 +81,15 @@ public class ClipboardSync {
     private Handler handler;
     private volatile boolean stopped;
 
-    // Worker thread state
-    private Mode mode = Mode.UNKNOWN;
+    // Worker thread state (mode and writeDenied are also read on the UI thread, to leave the
+    // device clipboard alone once nothing can be sent)
+    private volatile Mode mode = Mode.UNKNOWN;
     private long hostSeq = -1;
     private String legacyHostTextKey;
     // The host refused reading (GET) or setting (POST) its clipboard for this device (401):
     // polling stops, or sending does, for the rest of the stream
     private boolean readDenied;
-    private boolean writeDenied;
+    private volatile boolean writeDenied;
     // The host did not answer type=info (401 before reading was allowed), so Extended is assumed
     // for sending until an image is refused as an unknown type
     private boolean modeAssumed;
@@ -145,6 +146,11 @@ public class ClipboardSync {
     /** The stream window got focus: send what the user copied on the device since last time. */
     public void onFocusGained() {
         if (stopped || handler == null) {
+            return;
+        }
+        if (writeDenied || mode == Mode.DISABLED) {
+            // Nothing can be sent for the rest of the stream: do not read the clipboard (Android
+            // 12+ shows a "pasted from clipboard" notice for every read) on each return
             return;
         }
         ClipboardManager cm = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
