@@ -26,6 +26,9 @@
     <string name="hermit_action_delete">삭제</string>
     <string name="hermit_action_quit_app">앱 종료</string>
     <string name="hermit_pair_cancelled">페어링을 취소했습니다</string>
+    <string name="hermit_pair_open_web">Shell 페어링 페이지 열기</string>
+    <string name="hermit_pair_open_web_help">브라우저가 호스트의 자체 서명 인증서를 경고하고 Shell 웹 UI 비밀번호를 묻는 것은 정상입니다.</string>
+    <string name="hermit_pair_no_browser">페어링 페이지를 열 브라우저가 없습니다. 호스트의 페어링 페이지에 PIN을 직접 입력하세요.</string>
     <string name="hermit_shield_hdr_firmware">HDR을 쓰려면 NVIDIA SHIELD Android TV 펌웨어를 업데이트하세요</string>
     <string name="hermit_conn_version_malformed">서버 버전 정보가 올바르지 않습니다</string>
     <string name="hermit_conn_not_paired">이 기기는 PC와 페어링되어 있지 않습니다</string>

@@ -34,6 +34,13 @@ extensions that only Shell provides; they are marked **(Shell)** below.
 - Tap a PC to pair. The pairing dialog shows the PIN in large digits; enter it on the host's pairing
   page (in Shell: web UI → Pairing). **Cancel** (or Back) withdraws the pending pairing request, and
   the dialog closes by itself once pairing succeeds.
+- **Open Shell pairing page** (shown for open-source hosts, not NVIDIA GameStream) opens the host's
+  web UI pairing page in the browser with the PIN and this device's name already filled in; on Shell
+  you only confirm. The page is `https://<host>:<web UI port>/pin` (the web UI port is the host's
+  HTTP port + 1, 47990 by default). The PIN and name are in the URL fragment, so they do not reach
+  the host's request log. The browser warns about the host's self-signed certificate and asks for
+  the Shell web UI password; both are expected. Other open-source hosts show their own pairing page
+  without the prefill.
 - Hermit has its own application ID, so it can be installed next to other GameStream clients. Its
   pairing and settings are stored separately.
 

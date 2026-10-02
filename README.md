@@ -100,7 +100,9 @@ GameStream clients without affecting them.
 2. Open Hermit. PCs on the same network appear automatically. For a PC on another network, tap **+**
    and enter its IP address or host name.
 3. Tap the PC. Hermit shows a PIN: enter it on the host's pairing page (in Shell: web UI →
-   Pairing). The dialog closes when pairing is complete.
+   Pairing), or tap **Open Shell pairing page** to open that page in your browser with the PIN
+   filled in (the browser warns about the host's self-signed certificate and asks for the Shell
+   web UI password). The dialog closes when pairing is complete.
 4. Tap the PC again to see its apps, and tap an app (for example Desktop) to start streaming.
 
 While streaming, press **Back** (or tap the handle at the screen edge) for the stream settings panel.

@@ -175,6 +175,11 @@ hermit = [
     ('hermit_action_delete', 'Delete', '삭제'),
     ('hermit_action_quit_app', 'Quit app', '앱 종료'),
     ('hermit_pair_cancelled', 'Pairing cancelled', '페어링을 취소했습니다'),
+    ('hermit_pair_open_web', 'Open Shell pairing page', 'Shell 페어링 페이지 열기'),
+    ('hermit_pair_open_web_help', 'The browser warns about the host\'s self-signed certificate and asks for the Shell web UI password; both are expected.',
+     '브라우저가 호스트의 자체 서명 인증서를 경고하고 Shell 웹 UI 비밀번호를 묻는 것은 정상입니다.'),
+    ('hermit_pair_no_browser', 'No browser to open the pairing page. Enter the PIN on the host\'s pairing page yourself.',
+     '페어링 페이지를 열 브라우저가 없습니다. 호스트의 페어링 페이지에 PIN을 직접 입력하세요.'),
     ('hermit_shield_hdr_firmware', 'Update the firmware on your NVIDIA SHIELD Android TV to enable HDR', 'HDR을 쓰려면 NVIDIA SHIELD Android TV 펌웨어를 업데이트하세요'),
 
     # Upstream connection messages (NvConnection) that were hard-coded in English

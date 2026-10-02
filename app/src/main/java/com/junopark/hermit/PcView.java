@@ -13,6 +13,7 @@ import com.junopark.hermit.grid.assets.DiskAssetLoader;
 import com.junopark.hermit.hermit.CrashReporter;
 import com.junopark.hermit.hermit.RemoteShutdown;
 import com.junopark.hermit.hermit.SessionSummary;
+import com.junopark.hermit.hermit.ShellPairingPage;
 import com.junopark.hermit.nvstream.http.ComputerDetails;
 import com.junopark.hermit.nvstream.http.NvApp;
 import com.junopark.hermit.nvstream.http.NvHTTP;
@@ -55,6 +56,7 @@ import android.view.View.OnClickListener;
 import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
+import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
@@ -443,7 +445,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                         final NvHTTP pairingConn = httpConn;
 
                         // Hermit: a PIN dialog that stays up until pairing ends; Cancel aborts it
-                        runOnUiThread(() -> showPairingDialog(pinStr, attempt, () -> {
+                        runOnUiThread(() -> showPairingDialog(computer, pinStr, attempt, () -> {
                             cancelled.set(true);
                             new Thread(pairingConn::cancelPendingRequests).start();
                         }));
@@ -529,8 +531,9 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
         }).start();
     }
 
-    // Hermit: the PIN large on its own line, the Shell hint, and one Cancel button (also back)
-    private void showPairingDialog(String pin, Object attempt, Runnable onCancel) {
+    // Hermit: the PIN large on its own line, the Shell hint, a button that opens the host's web UI
+    // pairing page with the PIN filled in (open-source hosts), and one Cancel button (also back)
+    private void showPairingDialog(ComputerDetails computer, String pin, Object attempt, Runnable onCancel) {
         if (isFinishing()) {
             return;
         }
@@ -559,6 +562,24 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
         help.setTextColor(getResources().getColor(R.color.hermit_text_secondary));
         help.setPadding(0, Math.round(12 * density), 0, 0);
         content.addView(help);
+
+        if (ShellPairingPage.isAvailable(computer)) {
+            Button openPage = new Button(this);
+            openPage.setText(R.string.hermit_pair_open_web);
+            openPage.setOnClickListener(v -> ShellPairingPage.open(PcView.this, computer, pin));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            params.gravity = Gravity.CENTER_HORIZONTAL;
+            params.topMargin = Math.round(12 * density);
+            content.addView(openPage, params);
+
+            TextView webHelp = new TextView(this);
+            webHelp.setText(R.string.hermit_pair_open_web_help);
+            webHelp.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+            webHelp.setTextColor(getResources().getColor(R.color.hermit_text_secondary));
+            webHelp.setPadding(0, Math.round(4 * density), 0, 0);
+            content.addView(webHelp);
+        }
 
         pairingDialog = new AlertDialog.Builder(this)
                 .setTitle(R.string.pair_pairing_title)

@@ -26,6 +26,9 @@
     <string name="hermit_action_delete">Delete</string>
     <string name="hermit_action_quit_app">Quit app</string>
     <string name="hermit_pair_cancelled">Pairing cancelled</string>
+    <string name="hermit_pair_open_web">Open Shell pairing page</string>
+    <string name="hermit_pair_open_web_help">The browser warns about the host\'s self-signed certificate and asks for the Shell web UI password; both are expected.</string>
+    <string name="hermit_pair_no_browser">No browser to open the pairing page. Enter the PIN on the host\'s pairing page yourself.</string>
     <string name="hermit_shield_hdr_firmware">Update the firmware on your NVIDIA SHIELD Android TV to enable HDR</string>
     <string name="hermit_conn_version_malformed">Server version malformed</string>
     <string name="hermit_conn_not_paired">Device not paired with computer</string>
