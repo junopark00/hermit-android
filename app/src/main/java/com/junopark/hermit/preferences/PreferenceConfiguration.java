@@ -98,7 +98,7 @@ public class PreferenceConfiguration {
     private static final boolean DEFAULT_VIBRATE_FALLBACK = false;
     private static final int DEFAULT_VIBRATE_FALLBACK_STRENGTH = 100;
     private static final boolean DEFAULT_FLIP_FACE_BUTTONS = false;
-    public static final boolean DEFAULT_TOUCHSCREEN_TRACKPAD = true;  // Hermit: public, the stream panel reads it too
+    public static final boolean DEFAULT_TOUCHSCREEN_TRACKPAD = false;  // Hermit: direct touch by default; public, the stream panel reads it too
     private static final String DEFAULT_AUDIO_CONFIG = "2"; // Stereo
     private static final boolean DEFAULT_LATENCY_TOAST = false;
     private static final String DEFAULT_FRAME_PACING = "latency";
