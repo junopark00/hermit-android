@@ -37,7 +37,9 @@ extensions that only Shell provides; they are marked **(Shell)** below.
   pairing succeeds. **Cancel** (or Back) stops waiting and asks the host to drop this device's
   unfinished pairing, so a PIN entered on the host afterwards no longer pairs it (if the host can't
   be reached, the attempt stays there until it times out). Each Hermit install pairs under its own
-  ID, so several devices can pair with the same host at once.
+  ID, so several devices can pair with the same host at once. NVIDIA GameStream hosts are the
+  exception: they are paired under the shared GameStream ID like every other request to them, and
+  Cancel there only stops waiting.
 - **Open Shell pairing page** (shown for open-source hosts, not NVIDIA GameStream) opens the host's
   web UI pairing page in the browser with the PIN and this device's name already filled in; on Shell
   you only confirm. The page is `https://<host>:<web UI port>/pin` (the web UI port is the host's

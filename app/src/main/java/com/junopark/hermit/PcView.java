@@ -444,7 +444,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
         final java.util.concurrent.atomic.AtomicBoolean cancelled = new java.util.concurrent.atomic.AtomicBoolean();
         final Object attempt = new Object();
         final int generation = pairingGeneration.incrementAndGet();
-        final String uniqueId = managerBinder.getUniqueId();
+        final String uniqueId = NvHTTP.pairingUniqueId(computer, managerBinder.getUniqueId());
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -579,6 +579,11 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     // it a PIN entered in the web UI: /unpair with this device's ID drops it. Best effort, off the
     // UI thread; skipped once a newer attempt from this device has replaced it on the host.
     private void withdrawPairing(ComputerDetails computer, String uniqueId, int generation) {
+        if (computer.nvidiaServer) {
+            // GameStream pairs under the shared ID (NvHTTP.pairingUniqueId()), so its /unpair would
+            // unpair every client using that ID, not only this attempt
+            return;
+        }
         synchronized (pairingWithdrawLock) {
             if (pairingGeneration.get() != generation) {
                 return;
@@ -715,8 +720,8 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 String message;
                 try {
                     httpConn = new NvHTTP(ServerHelper.getCurrentAddressFromComputer(computer),
-                            computer.httpsPort, managerBinder.getUniqueId(), computer.serverCert,
-                            PlatformBinding.getCryptoProvider(PcView.this));
+                            computer.httpsPort, NvHTTP.pairingUniqueId(computer, managerBinder.getUniqueId()),
+                            computer.serverCert, PlatformBinding.getCryptoProvider(PcView.this));
                     if (httpConn.getPairState() == PairingManager.PairState.PAIRED) {
                         httpConn.unpair();
                         if (httpConn.getPairState() == PairingManager.PairState.NOT_PAIRED) {

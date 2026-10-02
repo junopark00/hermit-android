@@ -66,11 +66,12 @@ import okhttp3.ResponseBody;
 
 
 public class NvHTTP {
-    // GameStream's shared client ID, sent on everything but pairing (see the constructor)
+    // GameStream's shared client ID, sent on everything but pairing (see the constructor) and on
+    // pairing with NVIDIA GameStream hosts (see pairingUniqueId())
     private static final String SHARED_UNIQUE_ID = "0123456789ABCDEF";
 
     private String uniqueId;
-    // Hermit: this install's own ID, sent on the pairing requests only (/pair and /unpair)
+    // Hermit: the ID sent on the pairing requests only (/pair and /unpair)
     private String pairingUniqueId;
     private PairingManager pm;
 
@@ -210,6 +211,16 @@ public class NvHTTP {
         return new HttpUrl.Builder().scheme("https").host(baseUrlHttp.host()).port(httpsPort).build();
     }
     
+    /**
+     * Hermit: the uniqueId to create an NvHTTP with for pairing with this host (/pair and /unpair),
+     * given this install's own ID. NVIDIA GameStream keys its pairing record by uniqueid while every
+     * other request carries the shared ID, so a GameStream host is paired under the shared ID too;
+     * under this install's ID it would keep reporting the PC as unpaired.
+     */
+    public static String pairingUniqueId(ComputerDetails computer, String installUniqueId) {
+        return computer.nvidiaServer ? SHARED_UNIQUE_ID : installUniqueId;
+    }
+
     public NvHTTP(ComputerDetails.AddressTuple address, int httpsPort, String uniqueId, X509Certificate serverCert, ClientCryptoProvider cryptoProvider) throws IOException {
         // Use the same UID as other GameStream clients so we can quit games
         // started by them.
