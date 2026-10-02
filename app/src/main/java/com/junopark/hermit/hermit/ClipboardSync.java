@@ -9,6 +9,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
+import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
@@ -19,6 +21,7 @@ import com.junopark.hermit.R;
 import com.junopark.hermit.nvstream.http.HostHttpResponseException;
 import com.junopark.hermit.nvstream.http.NvHTTP;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -914,14 +917,75 @@ public class ClipboardSync {
         while ((long) (bounds.outWidth / options.inSampleSize) * (bounds.outHeight / options.inSampleSize) > MAX_CONVERTED_PIXELS) {
             options.inSampleSize *= 2;
         }
+        // BitmapFactory ignores the EXIF orientation, so a portrait camera photo would arrive
+        // on its side
+        Matrix orientation = exifOrientation(data);
         Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length, options);
         if (bitmap == null) {
             throw new IOException("Unsupported image format: " + mime);
         }
-        ByteArrayOutputStream png = new ByteArrayOutputStream();
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, png);
-        bitmap.recycle();
-        return png.toByteArray();
+        try {
+            if (orientation != null) {
+                Bitmap oriented = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(),
+                        orientation, true);
+                if (oriented != bitmap) {
+                    bitmap.recycle();
+                    bitmap = oriented;
+                }
+            }
+            ByteArrayOutputStream png = new ByteArrayOutputStream();
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, png);
+            return png.toByteArray();
+        } finally {
+            bitmap.recycle();
+        }
+    }
+
+    /**
+     * The rotation or flip the EXIF orientation of an image asks for, or null if none (or the
+     * orientation cannot be read: below Android 7 it is not, and the image is sent as stored).
+     */
+    private static Matrix exifOrientation(byte[] data) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            return null;
+        }
+        int orientation;
+        try {
+            orientation = new ExifInterface(new ByteArrayInputStream(data))
+                    .getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+        } catch (IOException | RuntimeException e) {
+            HermitLog.warning("Clipboard image orientation could not be read: " + e);
+            return null;
+        }
+        Matrix matrix = new Matrix();
+        switch (orientation) {
+            case ExifInterface.ORIENTATION_FLIP_HORIZONTAL:
+                matrix.setScale(-1, 1);
+                break;
+            case ExifInterface.ORIENTATION_ROTATE_180:
+                matrix.setRotate(180);
+                break;
+            case ExifInterface.ORIENTATION_FLIP_VERTICAL:
+                matrix.setScale(1, -1);
+                break;
+            case ExifInterface.ORIENTATION_TRANSPOSE:
+                matrix.setRotate(90);
+                matrix.postScale(-1, 1);
+                break;
+            case ExifInterface.ORIENTATION_ROTATE_90:
+                matrix.setRotate(90);
+                break;
+            case ExifInterface.ORIENTATION_TRANSVERSE:
+                matrix.setRotate(-90);
+                matrix.postScale(-1, 1);
+                break;
+            case ExifInterface.ORIENTATION_ROTATE_270:
+                matrix.setRotate(-90);
+                break;
+            default:
+                return null;
+        }
+        return matrix;
     }
 
     private static boolean isPng(byte[] data) {
