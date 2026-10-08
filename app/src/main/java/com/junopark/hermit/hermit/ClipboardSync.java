@@ -597,9 +597,11 @@ public class ClipboardSync {
         String type = parseField(info, "type");
         if ("none".equals(type)) {
             // Nothing on the host clipboard under a new change number: not a change a device clip
-            // waiting to be sent has to yield to. A program that writes the clipboard empties it
-            // first and adds its content afterwards, and an older Shell can answer in between, so
-            // this number is looked at again on the next polls before settling on it.
+            // waiting to be sent has to yield to (content in formats the host does not sync is one,
+            // "other" from Shell 1.1.1 on; Shell 1.1.0 answers "none" for it as well). A program
+            // that writes the clipboard empties it first and adds its content afterwards, and an
+            // older Shell can answer in between, so this number is looked at again on the next
+            // polls before settling on it.
             if (!order.hostSeenEmpty(seqKey(seq))) {
                 return;
             }
