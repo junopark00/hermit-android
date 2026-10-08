@@ -594,6 +594,27 @@ public class ClipboardSync {
         if (seq < 0) {
             return;
         }
+        String type = parseField(info, "type");
+        if ("none".equals(type)) {
+            // Nothing on the host clipboard under a new change number: not a change a device clip
+            // waiting to be sent has to yield to. A program that writes the clipboard empties it
+            // first and adds its content afterwards, and an older Shell can answer in between, so
+            // this number is looked at again on the next polls before settling on it.
+            if (!order.hostSeenEmpty(seqKey(seq))) {
+                return;
+            }
+            pending = null; // whatever was fetched before is no longer on the host
+            HermitLog.info("Clipboard: host content seq " + seq + ", type none");
+            if (seq != noneChecksSeq) {
+                noneChecksSeq = seq;
+                noneChecks = 0;
+            }
+            if (noneChecks < MAX_NONE_CHECKS) {
+                noneChecks++;
+                order.hostRetry(seqKey(seq));
+            }
+            return;
+        }
         switch (order.hostSeen(seqKey(seq), requested, latestDeviceCopy)) {
             case UNCHANGED:
                 return;
@@ -603,12 +624,7 @@ public class ClipboardSync {
             default:
                 break;
         }
-        String type = parseField(info, "type");
         HermitLog.info("Clipboard: host content seq " + seq + ", type " + type);
-        if (seq != noneChecksSeq) {
-            noneChecksSeq = seq;
-            noneChecks = 0;
-        }
 
         // The host clipboard changed: whatever was fetched before is no longer what the user
         // copied there last, so it is replaced, or dropped when nothing usable comes back.
@@ -645,12 +661,6 @@ public class ClipboardSync {
             } else if ("files".equals(type)) {
                 // Nothing this device can paste, and older text must not be applied instead
                 showFilesNotice();
-            } else if (noneChecks < MAX_NONE_CHECKS) {
-                // Nothing on the host clipboard under a new change number: a program that writes it
-                // empties it first and adds its content afterwards, and an older Shell can answer
-                // in between. Look at this number again on the next polls before settling on it.
-                noneChecks++;
-                order.hostRetry(seqKey(seq));
             }
         } catch (HostHttpResponseException e) {
             pending = null;

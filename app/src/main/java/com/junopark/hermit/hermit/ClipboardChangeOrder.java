@@ -12,7 +12,9 @@ package com.junopark.hermit.hermit;
  *   clipboard itself are not device copies;
  * - a host change (a new host clipboard sequence number; for text-only hosts, new text) at the
  *   time the request of the poll that first found it was issued: at most a poll interval after it
- *   was made, or as long as a transfer in progress (a poll waits behind it on the worker);
+ *   was made, or as long as a transfer in progress (a poll waits behind it on the worker). A new
+ *   sequence number under which the host clipboard is empty is not a change (hostSeenEmpty): a
+ *   device clip waiting to be sent still goes, as nothing on the host would be lost;
  * - a device clip sent to the host takes the time of its clip timestamp;
  * - host content found when sync is set up is not a change only at stream start; a setup that
  *   succeeds later takes it for a host change made when the last setup try failed (hostSetUp).
@@ -94,6 +96,20 @@ final class ClipboardChangeOrder {
         }
         hostPending = false;
         return hostMayReplaceDevice(hostTime, latestDeviceCopy) ? HostContent.FETCH : HostContent.SUPERSEDED;
+    }
+
+    /**
+     * A poll found the host clipboard empty under key: known, so it is not looked at again, but
+     * not a change a device clip waiting to be sent would have to yield to (nothing on the host
+     * replaces it). True when key is new, or waiting to be looked at again (hostRetry); false when
+     * it was already settled on. Whatever waited to be fetched again is gone from the host.
+     */
+    boolean hostSeenEmpty(String key) {
+        boolean fresh = !hostKnown || !key.equals(hostKey) || hostPending;
+        hostKnown = true;
+        hostKey = key;
+        hostPending = false;
+        return fresh;
     }
 
     /**
