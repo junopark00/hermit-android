@@ -325,9 +325,6 @@ public class QrScanActivity extends Activity {
             }
         } catch (CameraAccessException | IllegalArgumentException | SecurityException e) {
             failCamera(e.getClass().getSimpleName() + ": " + e.getMessage());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            failCamera("interrupted");
         }
     }
 
