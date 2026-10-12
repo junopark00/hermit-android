@@ -48,3 +48,6 @@ app/.externalNativeBuild/
 /signing/
 *.jks
 *.keystore
+
+# oh-my-claudecode session state
+.omc/
