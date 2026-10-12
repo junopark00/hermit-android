@@ -87,6 +87,9 @@ public class NvHTTP {
     // Hermit: how long getservercert waits for the PIN; just under Shell's 300 s, so this side
     // gives up first instead of finding the connection closed
     private static final int PAIRING_PIN_TIMEOUT = 295_000;
+    // Hermit: how long a QR pairing's getservercert waits. The host answers at once (the token
+    // takes the PIN's place), so a host still waiting for a PIN is given up on quickly
+    private static final int QR_PAIRING_TIMEOUT = 10_000;
     // Hermit: how long a clipboard POST waits for the reply after the last byte is sent. Shell
     // replies only once it has set its clipboard (an image up to 8192x8192 is decoded and converted
     // first, behind any earlier clipboard work), which can take much longer than READ_TIMEOUT.
@@ -104,6 +107,7 @@ public class NvHTTP {
     private OkHttpClient httpClientLongConnectNoReadTimeout;
     private OkHttpClient httpClientShortConnectTimeout;
     private OkHttpClient httpClientPairingPinWait;
+    private OkHttpClient httpClientQrPairingWait;
     private OkHttpClient httpClientClipboardSend;
 
     private X509TrustManager defaultTrustManager;
@@ -220,6 +224,11 @@ public class NvHTTP {
         httpClientPairingPinWait = httpClientLongConnectTimeout.newBuilder()
                 .readTimeout(PAIRING_PIN_TIMEOUT, TimeUnit.MILLISECONDS)
                 .retryOnConnectionFailure(false)
+                .build();
+
+        // Hermit: for a QR pairing's getservercert (see QR_PAIRING_TIMEOUT); no silent resend either
+        httpClientQrPairingWait = httpClientPairingPinWait.newBuilder()
+                .readTimeout(QR_PAIRING_TIMEOUT, TimeUnit.MILLISECONDS)
                 .build();
 
         // Hermit: for clipboard POSTs (see CLIPBOARD_SEND_TIMEOUT); shares the dispatcher, so
@@ -491,10 +500,20 @@ public class NvHTTP {
     }
 
     private HttpUrl getCompleteUrl(HttpUrl baseUrl, String path, String query) {
+        return getCompleteUrl(baseUrl, path, query, null);
+    }
+
+    // Hermit: deviceName, when given, is added as a properly encoded parameter (the raw query
+    // string cannot carry an arbitrary name)
+    private HttpUrl getCompleteUrl(HttpUrl baseUrl, String path, String query, String deviceName) {
         boolean pairing = path.equals("pair") || path.equals("unpair");
-        return baseUrl.newBuilder()
+        HttpUrl.Builder builder = baseUrl.newBuilder()
                 .addPathSegment(path)
-                .query(query)
+                .query(query);
+        if (deviceName != null) {
+            builder.addQueryParameter("devicename", deviceName);
+        }
+        return builder
                 .addQueryParameter("uniqueid", pairing ? pairingUniqueId : uniqueId)
                 .addQueryParameter("uuid", UUID.randomUUID().toString())
                 .build();
@@ -509,10 +528,14 @@ public class NvHTTP {
     // The initial pair query does require outside action (user entering a PIN) but subsequent pairing
     // queries do not.
     private ResponseBody openHttpConnection(OkHttpClient client, HttpUrl baseUrl, String path, String query) throws IOException {
+        return openHttpConnection(client, baseUrl, path, query, null);
+    }
+
+    private ResponseBody openHttpConnection(OkHttpClient client, HttpUrl baseUrl, String path, String query, String deviceName) throws IOException {
         if (cancelled) {
             throw new IOException("Cancelled");
         }
-        HttpUrl completeUrl = getCompleteUrl(baseUrl, path, query);
+        HttpUrl completeUrl = getCompleteUrl(baseUrl, path, query, deviceName);
         Request request = new Request.Builder().url(completeUrl).get().build();
         Response response = execute(client, request);
 
@@ -540,19 +563,23 @@ public class NvHTTP {
     }
 
     private String openHttpConnectionToString(OkHttpClient client, HttpUrl baseUrl, String path, String query) throws IOException {
+        return openHttpConnectionToString(client, baseUrl, path, query, null);
+    }
+
+    private String openHttpConnectionToString(OkHttpClient client, HttpUrl baseUrl, String path, String query, String deviceName) throws IOException {
         try {
-            ResponseBody resp = openHttpConnection(client, baseUrl, path, query);
+            ResponseBody resp = openHttpConnection(client, baseUrl, path, query, deviceName);
             String respString = resp.string();
             resp.close();
 
             if (verbose && !path.equals("serverinfo")) {
-                HermitLog.info(getCompleteUrl(baseUrl, path, query)+" -> "+respString);
+                HermitLog.info(getCompleteUrl(baseUrl, path, query, deviceName)+" -> "+respString);
             }
 
             return respString;
         } catch (IOException e) {
             if (verbose && !path.equals("serverinfo")) {
-                HermitLog.warning(getCompleteUrl(baseUrl, path, query)+" -> "+e.getMessage());
+                HermitLog.warning(getCompleteUrl(baseUrl, path, query, deviceName)+" -> "+e.getMessage());
                 e.printStackTrace();
             }
             
@@ -793,6 +820,16 @@ public class NvHTTP {
                 baseUrlHttp, "pair", "devicename=roth&updateState=1&" + additionalArguments);
     }
 
+    /**
+     * Hermit: the getservercert of a QR pairing: the QR record's id and this device's real name
+     * on the query, and a short wait (the host answers without a PIN). The token never goes on
+     * the wire; the id is not a secret.
+     */
+    String executeQrPairingCommand(String additionalArguments, String qrId, String deviceName) throws HostHttpResponseException, IOException {
+        return openHttpConnectionToString(httpClientQrPairingWait, baseUrlHttp, "pair",
+                "updateState=1&qr=" + qrId + "&" + additionalArguments, deviceName);
+    }
+
     String executePairingChallenge() throws HostHttpResponseException, IOException {
         return openHttpConnectionToString(httpClientLongConnectTimeout, getHttpsUrl(true),
                 "pair", "devicename=roth&updateState=1&phrase=pairchallenge");
@@ -836,6 +873,11 @@ public class NvHTTP {
         return resp.byteStream();
     }
     
+    /** Hermit: whether the host accepts QR pairing (Shell 1.3.0 or later: serverinfo carries qrPairing=1). */
+    public static boolean supportsQrPairing(String serverInfo) throws XmlPullParserException, IOException {
+        return "1".equals(getXmlString(serverInfo, "qrPairing", false));
+    }
+
     public int getServerMajorVersion(String serverInfo) throws XmlPullParserException, IOException {
         return getServerAppVersionQuad(serverInfo)[0];
     }

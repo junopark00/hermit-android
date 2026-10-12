@@ -10,6 +10,7 @@ import com.junopark.hermit.HermitLog;
 
 import java.security.cert.Certificate;
 import java.io.*;
+import java.net.SocketTimeoutException;
 import java.security.*;
 import java.security.cert.*;
 import java.util.Arrays;
@@ -33,7 +34,29 @@ public class PairingManager {
         PAIRED,
         PIN_WRONG,
         FAILED,
-        ALREADY_IN_PROGRESS
+        ALREADY_IN_PROGRESS,
+        // Hermit, QR pairing: the host's certificate is not the one the QR code named
+        CERT_MISMATCH,
+        // Hermit, QR pairing: the host did not answer getservercert in time
+        NO_ANSWER
+    }
+
+    /**
+     * Hermit: the extra inputs of a QR pairing (notes/DESIGN-I-qr-pairing.md): the QR record's id
+     * and this device's name go on the getservercert query, and the host certificate must hash to
+     * the fingerprint before the pairing goes on.
+     */
+    public static final class QrPairing {
+        final String id;
+        /** SHA-256 of the host certificate's DER, lowercase hex. */
+        final String fingerprint;
+        final String deviceName;
+
+        public QrPairing(String id, String fingerprint, String deviceName) {
+            this.id = id;
+            this.fingerprint = fingerprint;
+            this.deviceName = deviceName;
+        }
     }
     
     public PairingManager(NvHTTP http, ClientCryptoProvider cryptoProvider) {
@@ -204,6 +227,15 @@ public class PairingManager {
     }
 
     public PairState pair(String serverInfo, String pin) throws IOException, XmlPullParserException {
+        return pair(serverInfo, pin, null);
+    }
+
+    /**
+     * Hermit: with qr, the QR pairing flow: pin is the link's token (the key derivation does not
+     * assume a length), getservercert names the QR record and is not waited on for long, and the
+     * certificate is checked against the fingerprint before anything is sent under it.
+     */
+    public PairState pair(String serverInfo, String pin, QrPairing qr) throws IOException, XmlPullParserException {
         PairingHashAlgorithm hashAlgo;
         serverCertAnswered = false;
 
@@ -226,9 +258,22 @@ public class PairingManager {
         
         // Send the salt and get the server cert. This doesn't have a read timeout
         // because the user must enter the PIN before the server responds
-        String getCert = http.executePairingCommand("phrase=getservercert&salt="+
-                bytesToHex(salt)+"&clientcert="+bytesToHex(pemCertBytes),
-                false);
+        String getCertArguments = "phrase=getservercert&salt="+
+                bytesToHex(salt)+"&clientcert="+bytesToHex(pemCertBytes);
+        String getCert;
+        if (qr == null) {
+            getCert = http.executePairingCommand(getCertArguments, false);
+        }
+        else {
+            // A QR pairing is answered at once; a host that waits for a PIN instead (one that
+            // ignores qr=) is given up on, and the attempt it keeps is dropped
+            try {
+                getCert = http.executeQrPairingCommand(getCertArguments, qr.id, qr.deviceName);
+            } catch (SocketTimeoutException e) {
+                cancelPairing();
+                return PairState.NO_ANSWER;
+            }
+        }
         serverCertAnswered = true;
         if (!NvHTTP.getXmlString(getCert, "paired", true).equals("1")) {
             return PairState.FAILED;
@@ -241,6 +286,14 @@ public class PairingManager {
             // to give an empty cert in the response.
             cancelPairing();
             return PairState.ALREADY_IN_PROGRESS;
+        }
+
+        // Hermit: a QR pairing trusts only the certificate the QR code named. Checked before the
+        // challenge, so nothing is sent under a cert that is not the host's; the cert is not kept.
+        if (qr != null && !fingerprintMatches(serverCert, qr.fingerprint)) {
+            serverCert = null;
+            cancelPairing();
+            return PairState.CERT_MISMATCH;
         }
 
         // Require this cert for TLS to this host
@@ -316,6 +369,17 @@ public class PairingManager {
         return PairState.PAIRED;
     }
     
+    /** Hermit: whether SHA-256 of the certificate's DER encoding is the given lowercase hex digest. */
+    private static boolean fingerprintMatches(X509Certificate cert, String fingerprint) {
+        byte[] der;
+        try {
+            der = cert.getEncoded();
+        } catch (CertificateEncodingException e) {
+            return false;
+        }
+        return bytesToHex(new Sha256PairingHash().hashData(der)).toLowerCase(Locale.ROOT).equals(fingerprint);
+    }
+
     private interface PairingHashAlgorithm {
         int getHashLength();
         byte[] hashData(byte[] data);
