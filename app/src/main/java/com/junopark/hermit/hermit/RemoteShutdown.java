@@ -59,10 +59,6 @@ public class RemoteShutdown {
         new RemoteShutdown(activity, computer, uniqueId, action).query();
     }
 
-    private boolean restart() {
-        return RESTART.equals(action);
-    }
-
     /** Sleep or hibernation: nothing on the host is closed, and it may need Wake-on-LAN to come back. */
     private boolean suspend() {
         return SLEEP.equals(action) || HIBERNATE.equals(action);
