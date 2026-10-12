@@ -51,7 +51,8 @@ rely on Shell's extensions are marked below.
   device's battery and thermal state.
 - **Session summary** after each stream, compared with your recent sessions.
 - **Clipboard sync** in both directions for text, and images too with Shell. Files are not synced.
-- **Remote shutdown and restart** of the PC from the PC list (Shell).
+- **Remote shutdown, restart, sleep and hibernation** of the PC from the PC list (Shell; sleep and
+  hibernation only when the host reports them, with a warning when Wake-on-LAN is off).
 - **Automatic reconnect** after a network drop.
 - **English and Korean** interface, in a dark theme shared with Hermit for Windows.
 
@@ -68,7 +69,7 @@ All features are described in the [feature guide](docs/guide.md).
 | Clipboard sync: text | Yes | Hosts with the same clipboard extension (e.g. Apollo) |
 | Clipboard sync: images | Yes | No |
 | Clipboard sync: files | No | No |
-| Remote shutdown and restart | Yes | No |
+| Remote shutdown, restart, sleep and hibernation | Yes | No |
 
 ## Requirements
 

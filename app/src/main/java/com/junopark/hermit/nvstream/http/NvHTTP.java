@@ -1057,6 +1057,12 @@ public class NvHTTP {
         public boolean allowed;
         /** Other devices streaming from the host right now. */
         public final List<String> clients = new ArrayList<>();
+        /** The host can sleep (S1-S3 or modern standby); false when it did not say. */
+        public boolean sleep;
+        /** The host can hibernate (S4 with the hibernation file); false when it did not say. */
+        public boolean hibernate;
+        /** Whether Wake-on-LAN wakes the host: "yes", "no" or "unknown" (also when it did not say). */
+        public String wol = "unknown";
     }
 
     private String hermitPowerCall(String action, boolean force) throws IOException {
@@ -1079,8 +1085,9 @@ public class NvHTTP {
     }
 
     /**
-     * Hermit: asks Shell whether this device may turn it off or restart it, and who else is
-     * streaming. Throws HostHttpResponseException 404 when the host has no such request.
+     * Hermit: asks Shell whether this device may turn it off or restart it, what else it can do
+     * (sleep, hibernate, Wake-on-LAN) and who else is streaming. Throws HostHttpResponseException
+     * 404 when the host has no such request.
      */
     public PowerState hermitPowerQuery() throws IOException {
         PowerState state = new PowerState();
@@ -1094,13 +1101,25 @@ public class NvHTTP {
             else if (line.startsWith("client=")) {
                 state.clients.add(line.substring(7).trim());
             }
+            else if (line.startsWith("sleep=")) {
+                state.sleep = line.substring(6).trim().equals("1");
+            }
+            else if (line.startsWith("hibernate=")) {
+                state.hibernate = line.substring(10).trim().equals("1");
+            }
+            else if (line.startsWith("wol=")) {
+                String value = line.substring(4).trim();
+                state.wol = value.equals("yes") || value.equals("no") ? value : "unknown";
+            }
         }
         return state;
     }
 
     /**
-     * Hermit: turns the host off ("shutdown") or restarts it ("restart"); force also closes apps
-     * that would hold it back. Returns false when the host answered but did nothing.
+     * Hermit: turns the host off ("shutdown"), restarts it ("restart"), puts it to sleep ("sleep")
+     * or hibernates it ("hibernate"); force also closes apps that would hold a shutdown back.
+     * Returns false when the host answered but did nothing. Throws HostHttpResponseException 409
+     * when the host cannot sleep or hibernate right now.
      */
     public boolean hermitPowerAction(String action, boolean force) throws IOException {
         return hermitPowerCall(action, force).startsWith("ok");

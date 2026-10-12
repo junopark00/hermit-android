@@ -23,36 +23,68 @@ import java.io.FileNotFoundException;
 import java.util.List;
 
 /**
- * Turning the host PC off or restarting it from the PC list (Shell's GET /actions/power), following
- * Hermit for Windows.
+ * Turning the host PC off, restarting it, or putting it to sleep from the PC list (Shell's
+ * GET /actions/power), following Hermit for Windows.
  * The host is asked first whether this device may and which other devices are streaming; when
  * there are any, they are named in a warning so nobody is cut off by accident. Then a
- * confirmation, with an option to also close apps that have unsaved work.
+ * confirmation, with an option to also close apps that have unsaved work (shutdown and restart)
+ * and, before sleep or hibernation, a line saying when the PC may not be reachable again
+ * (Wake-on-LAN off on the host, or not checkable).
  */
 public class RemoteShutdown {
+    public static final String SHUTDOWN = "shutdown";
+    public static final String RESTART = "restart";
+    public static final String SLEEP = "sleep";
+    public static final String HIBERNATE = "hibernate";
+
     private static final int WARNING_COLOR = 0xFFF1C21B;
 
     private final Activity activity;
     private final ComputerDetails computer;
     private final String uniqueId;
-    private final boolean restart;
+    /** One of SHUTDOWN, RESTART, SLEEP or HIBERNATE. */
+    private final String action;
     private AlertDialog progress;
     private boolean cancelled;
 
-    private RemoteShutdown(Activity activity, ComputerDetails computer, String uniqueId, boolean restart) {
+    private RemoteShutdown(Activity activity, ComputerDetails computer, String uniqueId, String action) {
         this.activity = activity;
         this.computer = computer;
         this.uniqueId = uniqueId;
-        this.restart = restart;
+        this.action = action;
     }
 
-    /** restart: restart the PC instead of turning it off. */
-    public static void start(Activity activity, ComputerDetails computer, String uniqueId, boolean restart) {
-        new RemoteShutdown(activity, computer, uniqueId, restart).query();
+    /** action: SHUTDOWN, RESTART, SLEEP or HIBERNATE. */
+    public static void start(Activity activity, ComputerDetails computer, String uniqueId, String action) {
+        new RemoteShutdown(activity, computer, uniqueId, action).query();
+    }
+
+    private boolean restart() {
+        return RESTART.equals(action);
+    }
+
+    /** Sleep or hibernation: nothing on the host is closed, and it may need Wake-on-LAN to come back. */
+    private boolean suspend() {
+        return SLEEP.equals(action) || HIBERNATE.equals(action);
+    }
+
+    /** The string for this action out of the four per-action variants. */
+    private int perAction(int shutdown, int restart, int sleep, int hibernate) {
+        switch (action) {
+            case RESTART:
+                return restart;
+            case SLEEP:
+                return sleep;
+            case HIBERNATE:
+                return hibernate;
+            default:
+                return shutdown;
+        }
     }
 
     private String title() {
-        return activity.getString(restart ? R.string.hermit_power_restart_title : R.string.hermit_power_title, computer.name);
+        return activity.getString(perAction(R.string.hermit_power_title, R.string.hermit_power_restart_title,
+                R.string.hermit_power_sleep_title, R.string.hermit_power_hibernate_title), computer.name);
     }
 
     private NvHTTP connect() throws Exception {
@@ -69,6 +101,11 @@ public class RemoteShutdown {
             }
             if (code == 404 || code == 501) {
                 return activity.getString(R.string.hermit_power_unsupported);
+            }
+            if (code == 409 && suspend()) {
+                // Shell: the host cannot sleep or hibernate right now (hibernation turned off)
+                return activity.getString(HIBERNATE.equals(action) ? R.string.hermit_power_unavailable_hibernate
+                        : R.string.hermit_power_unavailable_sleep, computer.name);
             }
             // The host answered but could not do it (for example a shutdown already under way)
             return activity.getString(R.string.hermit_power_failed, code);
@@ -125,7 +162,7 @@ public class RemoteShutdown {
                     showError(activity.getString(R.string.hermit_power_no_permission));
                 }
                 else {
-                    confirm(result.clients);
+                    confirm(result.clients, result.wol);
                 }
             });
         }).start();
@@ -136,7 +173,8 @@ public class RemoteShutdown {
                 activity.getResources().getDisplayMetrics()));
     }
 
-    private void confirm(List<String> clients) {
+    /** wol: whether Wake-on-LAN wakes the host, "yes", "no" or "unknown". */
+    private void confirm(List<String> clients, String wol) {
         LinearLayout content = new LinearLayout(activity);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(24), dp(12), dp(24), 0);
@@ -158,7 +196,8 @@ public class RemoteShutdown {
             TextView warning = new TextView(activity);
             warning.setText(activity.getString(R.string.hermit_power_others, clients.size())
                     + "\n" + TextUtils.join(", ", clients)
-                    + "\n" + activity.getString(restart ? R.string.hermit_power_others_end_restart : R.string.hermit_power_others_end));
+                    + "\n" + activity.getString(perAction(R.string.hermit_power_others_end, R.string.hermit_power_others_end_restart,
+                            R.string.hermit_power_others_end_sleep, R.string.hermit_power_others_end_hibernate)));
             warning.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
             warning.setLineSpacing(dp(2), 1f);
             warning.setPadding(dp(12), dp(10), dp(12), dp(10));
@@ -171,36 +210,57 @@ public class RemoteShutdown {
         }
 
         TextView question = new TextView(activity);
-        question.setText(activity.getString(restart ? R.string.hermit_power_confirm_restart : R.string.hermit_power_confirm, computer.name));
+        question.setText(activity.getString(perAction(R.string.hermit_power_confirm, R.string.hermit_power_confirm_restart,
+                R.string.hermit_power_confirm_sleep, R.string.hermit_power_confirm_hibernate), computer.name));
         question.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         content.addView(question);
 
-        CheckBox force = new CheckBox(activity);
-        force.setText(R.string.hermit_power_force);
-        force.setMinHeight(dp(48));
-        LinearLayout.LayoutParams forceParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        forceParams.topMargin = dp(8);
-        content.addView(force, forceParams);
+        CheckBox force = null;
+        if (suspend()) {
+            // Whether the PC can be woken again, unless the host confirmed Wake-on-LAN
+            if (!"yes".equals(wol)) {
+                TextView wake = new TextView(activity);
+                wake.setText("no".equals(wol) ? R.string.hermit_power_wol_off : R.string.hermit_power_wol_unknown);
+                wake.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+                wake.setTextColor(WARNING_COLOR);
+                LinearLayout.LayoutParams wakeParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                wakeParams.topMargin = dp(8);
+                content.addView(wake, wakeParams);
+            }
+        }
+        else {
+            // Sleep and hibernation close nothing, so no force option for them
+            force = new CheckBox(activity);
+            force.setText(R.string.hermit_power_force);
+            force.setMinHeight(dp(48));
+            LinearLayout.LayoutParams forceParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            forceParams.topMargin = dp(8);
+            content.addView(force, forceParams);
+        }
 
+        final CheckBox forceBox = force;
+        int button = clients.isEmpty()
+                ? perAction(R.string.hermit_power_shutdown, R.string.hermit_power_restart, R.string.hermit_power_sleep, R.string.hermit_power_hibernate)
+                : perAction(R.string.hermit_power_shutdown_anyway, R.string.hermit_power_restart_anyway,
+                        R.string.hermit_power_sleep_anyway, R.string.hermit_power_hibernate_anyway);
         new AlertDialog.Builder(activity)
                 .setTitle(title())
                 .setView(content)
-                .setPositiveButton(restart
-                                ? (clients.isEmpty() ? R.string.hermit_power_restart : R.string.hermit_power_restart_anyway)
-                                : (clients.isEmpty() ? R.string.hermit_power_shutdown : R.string.hermit_power_shutdown_anyway),
-                        (d, w) -> run(force.isChecked()))
+                .setPositiveButton(button, (d, w) -> run(forceBox != null && forceBox.isChecked()))
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
     }
 
     private void run(boolean force) {
-        HermitNotice.show(activity, restart ? R.string.hermit_power_restarting : R.string.hermit_power_sending, HermitNotice.SHORT);
+        HermitNotice.show(activity, perAction(R.string.hermit_power_sending, R.string.hermit_power_restarting,
+                R.string.hermit_power_sleeping, R.string.hermit_power_hibernating), HermitNotice.SHORT);
         new Thread(() -> {
             Exception error = null;
             boolean ok = false;
             try {
-                ok = connect().hermitPowerAction(restart ? "restart" : "shutdown", force);
+                ok = connect().hermitPowerAction(action, force);
             } catch (Exception e) {
                 error = e;
             }
@@ -211,7 +271,8 @@ public class RemoteShutdown {
                     return;
                 }
                 if (done) {
-                    HermitNotice.show(activity, activity.getString(restart ? R.string.hermit_power_restart_sent : R.string.hermit_power_sent, computer.name), HermitNotice.LONG);
+                    HermitNotice.show(activity, activity.getString(perAction(R.string.hermit_power_sent, R.string.hermit_power_restart_sent,
+                            R.string.hermit_power_sleep_sent, R.string.hermit_power_hibernate_sent), computer.name), HermitNotice.LONG);
                 }
                 else {
                     showError(failure != null ? errorText(failure) : activity.getString(R.string.hermit_power_unsupported));

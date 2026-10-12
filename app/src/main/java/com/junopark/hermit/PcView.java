@@ -3,6 +3,8 @@ package com.junopark.hermit;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.UnknownHostException;
+import java.util.HashMap;
+import java.util.HashSet;
 
 import com.junopark.hermit.binding.PlatformBinding;
 import com.junopark.hermit.binding.crypto.AndroidCryptoProvider;
@@ -151,6 +153,18 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     private final static int FULL_APP_LIST_ID = 9;
     private final static int RESTART_PC_ID = 12;
     private final static int SHUTDOWN_PC_ID = 13;
+    private final static int SLEEP_PC_ID = 14;
+    private final static int HIBERNATE_PC_ID = 15;
+
+    // Hermit: what each online, paired host answered to the power query (whether it can sleep or
+    // hibernate), by uuid, so the long-press menu only offers what works. Asked once when the PC
+    // is seen online (a failed network attempt is tried again after a minute; a host without the
+    // request, such as Sunshine, is remembered as offering nothing) and forgotten when it goes
+    // offline. Main thread only.
+    private final HashMap<String, NvHTTP.PowerState> powerStates = new HashMap<>();
+    private final HashSet<String> powerQueriesPending = new HashSet<>();
+    private final HashMap<String, Long> powerQueryRetryAt = new HashMap<>();
+    private static final long POWER_QUERY_RETRY_MS = 60_000;
 
     private void initializeViews() {
         setContentView(R.layout.activity_pc_view);
@@ -417,6 +431,14 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
             // Hermit: turning the host off or restarting it (Shell); last, away from the rest
             menu.add(Menu.NONE, RESTART_PC_ID, 8, getResources().getString(R.string.hermit_power_menu_restart));
             menu.add(Menu.NONE, SHUTDOWN_PC_ID, 9, getResources().getString(R.string.hermit_power_menu_shutdown));
+            // Sleep and hibernation only when the host said it can (Shell); hidden otherwise
+            NvHTTP.PowerState power = powerStates.get(computer.details.uuid);
+            if (power != null && power.sleep) {
+                menu.add(Menu.NONE, SLEEP_PC_ID, 10, getResources().getString(R.string.hermit_power_menu_sleep));
+            }
+            if (power != null && power.hibernate) {
+                menu.add(Menu.NONE, HIBERNATE_PC_ID, 11, getResources().getString(R.string.hermit_power_menu_hibernate));
+            }
         }
 
         menu.add(Menu.NONE, DELETE_ID, 6, getResources().getString(R.string.pcview_menu_delete_pc));
@@ -861,12 +883,17 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
 
             case RESTART_PC_ID:
             case SHUTDOWN_PC_ID:
+            case SLEEP_PC_ID:
+            case HIBERNATE_PC_ID:
                 if (managerBinder == null) {
                     HermitNotice.show(PcView.this, getResources().getString(R.string.error_manager_not_running), HermitNotice.LONG);
                     return true;
                 }
-                RemoteShutdown.start(PcView.this, computer.details, managerBinder.getUniqueId(),
-                        item.getItemId() == RESTART_PC_ID);
+                String action = item.getItemId() == RESTART_PC_ID ? RemoteShutdown.RESTART
+                        : item.getItemId() == SLEEP_PC_ID ? RemoteShutdown.SLEEP
+                        : item.getItemId() == HIBERNATE_PC_ID ? RemoteShutdown.HIBERNATE
+                        : RemoteShutdown.SHUTDOWN;
+                RemoteShutdown.start(PcView.this, computer.details, managerBinder.getUniqueId(), action);
                 return true;
 
             default:
@@ -933,6 +960,57 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
 
         // Notify the view that the data has changed
         pcGridAdapter.notifyDataSetChanged();
+
+        // Hermit: what a Shell host can do (sleep, hibernate), for the long-press menu
+        if (details.state == ComputerDetails.State.ONLINE && details.pairState == PairState.PAIRED) {
+            queryPowerState(details);
+        }
+        else if (details.state == ComputerDetails.State.OFFLINE) {
+            powerStates.remove(details.uuid);
+            powerQueryRetryAt.remove(details.uuid);
+        }
+    }
+
+    /**
+     * Hermit: asks the host (once per time it is seen online) which power actions it supports.
+     * Main thread; the request runs on its own thread and nothing is sent to the PC but the query.
+     */
+    private void queryPowerState(ComputerDetails details) {
+        if (managerBinder == null || powerStates.containsKey(details.uuid) || powerQueriesPending.contains(details.uuid)) {
+            return;
+        }
+        Long retryAt = powerQueryRetryAt.get(details.uuid);
+        if (retryAt != null && SystemClock.elapsedRealtime() < retryAt) {
+            return;
+        }
+        powerQueriesPending.add(details.uuid);
+        final String uniqueId = managerBinder.getUniqueId();
+        final ComputerDetails snapshot = new ComputerDetails(details);
+        new Thread(() -> {
+            NvHTTP.PowerState state = null;
+            boolean retry = false;
+            try {
+                state = new NvHTTP(ServerHelper.getCurrentAddressFromComputer(snapshot), snapshot.httpsPort,
+                        uniqueId, snapshot.serverCert, PlatformBinding.getCryptoProvider(PcView.this)).hermitPowerQuery();
+            } catch (HostHttpResponseException | FileNotFoundException e) {
+                // Not a Shell host (404), or it refused: nothing to offer
+                state = new NvHTTP.PowerState();
+            } catch (Exception e) {
+                // Unreachable right now: asked again after a minute
+                retry = true;
+            }
+            final NvHTTP.PowerState result = state;
+            final boolean retryLater = retry;
+            runOnUiThread(() -> {
+                powerQueriesPending.remove(snapshot.uuid);
+                if (retryLater) {
+                    powerQueryRetryAt.put(snapshot.uuid, SystemClock.elapsedRealtime() + POWER_QUERY_RETRY_MS);
+                }
+                else {
+                    powerStates.put(snapshot.uuid, result);
+                }
+            });
+        }, "HermitPowerQuery").start();
     }
 
     @Override

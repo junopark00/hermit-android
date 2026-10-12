@@ -22,7 +22,7 @@ extensions that only Shell provides; they are marked **(Shell)** below.
 - [Session summary and history](#session-summary-and-history)
 - [Clipboard sync](#clipboard-sync)
 - [Automatic reconnect](#automatic-reconnect)
-- [Shutting down or restarting the PC (Shell)](#shutting-down-or-restarting-the-pc-shell)
+- [Shutting down, restarting or sleeping the PC (Shell)](#shutting-down-restarting-or-sleeping-the-pc-shell)
 - [Notices](#notices)
 - [Crash reports](#crash-reports)
 - [Appearance and languages](#appearance-and-languages)
@@ -363,9 +363,18 @@ Turn it on in Settings → Advanced, then choose **Performance overlay: metrics 
     stops instead.
 - **Reconnect automatically when the connection drops** in Settings → Host settings (on by default).
 
-## Shutting down or restarting the PC (Shell)
+## Shutting down, restarting or sleeping the PC (Shell)
 
 - Long-press a PC on the PC list → **Restart PC…** or **Shut down PC…** (online, paired PCs only).
+- **Put PC to sleep…** and **Hibernate PC…** are in the same menu when the host reports that it can
+  do them (Shell; hibernation needs the hibernation file, `powercfg /hibernate on`). Hermit asks the
+  host once when it is seen online and hides the items otherwise. Nothing on the host is closed: its
+  apps continue when it wakes.
+- Before sleep or hibernation, Hermit warns when the host says Wake-on-LAN is off on its wired network
+  adapter, or could not check it: the PC may then not be reachable until someone turns it on. When
+  Wake-on-LAN works, **Send Wake-On-LAN request** in the PC's menu wakes it (from sleep this needs the
+  adapter's "Wake on Magic Packet" setting and the "Allow this device to wake the computer"
+  permission; from hibernation also the firmware's wake-on-LAN setting).
 - Hermit first asks the host which other devices are connected and, if there are any, names them with
   a warning that their streams will end, then asks for confirmation.
 - **Also close apps with unsaved work (it is lost)** forces apps that block shutdown to close (unsaved work is lost).
