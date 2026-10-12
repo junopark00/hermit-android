@@ -210,23 +210,9 @@ public class RemoteShutdown {
         question.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         content.addView(question);
 
-        CheckBox force = null;
-        if (suspend()) {
-            // Whether the PC can be woken again, unless the host confirmed Wake-on-LAN
-            if (!"yes".equals(wol)) {
-                TextView wake = new TextView(activity);
-                wake.setText("no".equals(wol) ? R.string.hermit_power_wol_off : R.string.hermit_power_wol_unknown);
-                wake.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-                wake.setTextColor(WARNING_COLOR);
-                LinearLayout.LayoutParams wakeParams = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                wakeParams.topMargin = dp(8);
-                content.addView(wake, wakeParams);
-            }
-        }
-        else {
-            // Sleep and hibernation close nothing, so no force option for them
-            force = new CheckBox(activity);
+        // Sleep and hibernation close nothing, so no force option for them
+        final CheckBox force = suspend() ? null : new CheckBox(activity);
+        if (force != null) {
             force.setText(R.string.hermit_power_force);
             force.setMinHeight(dp(48));
             LinearLayout.LayoutParams forceParams = new LinearLayout.LayoutParams(
@@ -234,8 +220,18 @@ public class RemoteShutdown {
             forceParams.topMargin = dp(8);
             content.addView(force, forceParams);
         }
+        else if (!"yes".equals(wol)) {
+            // Whether the PC can be woken again, unless the host confirmed Wake-on-LAN
+            TextView wake = new TextView(activity);
+            wake.setText("no".equals(wol) ? R.string.hermit_power_wol_off : R.string.hermit_power_wol_unknown);
+            wake.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+            wake.setTextColor(WARNING_COLOR);
+            LinearLayout.LayoutParams wakeParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            wakeParams.topMargin = dp(8);
+            content.addView(wake, wakeParams);
+        }
 
-        final CheckBox forceBox = force;
         int button = clients.isEmpty()
                 ? perAction(R.string.hermit_power_shutdown, R.string.hermit_power_restart, R.string.hermit_power_sleep, R.string.hermit_power_hibernate)
                 : perAction(R.string.hermit_power_shutdown_anyway, R.string.hermit_power_restart_anyway,
@@ -243,7 +239,7 @@ public class RemoteShutdown {
         new AlertDialog.Builder(activity)
                 .setTitle(title())
                 .setView(content)
-                .setPositiveButton(button, (d, w) -> run(forceBox != null && forceBox.isChecked()))
+                .setPositiveButton(button, (d, w) -> run(force != null && force.isChecked()))
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
     }
