@@ -50,6 +50,18 @@ extensions that only Shell provides; they are marked **(Shell)** below.
   this device**, the host (Shell 1.1.2 or later) accepts the web UI from the PC itself only: enter the
   PIN on the host PC, or have **Settings > Network > Web UI Access** in Shell changed to the local
   network. Other open-source hosts show their own pairing page without the prefill.
+- **Pair with QR** (the QR icon on the PC list; Shell 1.3.0 or later) pairs without a PIN: on the
+  host's web UI pairing page, create a QR code (it holds the host's address, the fingerprint of its
+  certificate and a one-time 128-bit token that is valid for 120 seconds, from the local network or
+  Tailscale only), then scan it. Hermit asks for the camera permission at that moment only; with no
+  camera (Android TV) or the permission denied, it offers a field to paste the `hermit://pair?` link
+  shown under the QR code instead (nothing is read from the clipboard by itself, and a link opened in
+  another app never starts a pairing). The PC is added to the list like a manually added one, and the
+  host's certificate is checked against the QR code before pairing goes on; a host that answers with
+  a different certificate is refused and nothing is stored. The host reports a used, expired or
+  missing QR code, and a QR code scanned from outside the local network; an older host is told apart
+  before any request and the PC stays on the list for PIN pairing. The token is never logged or
+  shown.
 - Hermit has its own application ID, so it can be installed next to other GameStream clients. Its
   pairing and settings are stored separately.
 

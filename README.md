@@ -103,7 +103,10 @@ GameStream clients without affecting them.
 3. Tap the PC. Hermit shows a PIN: enter it on the host's pairing page (in Shell: web UI →
    Pairing), or tap **Open Shell pairing page** to open that page in your browser with the PIN
    filled in (the browser warns about the host's self-signed certificate and asks for the Shell
-   web UI password). The dialog closes when pairing is complete.
+   web UI password). The dialog closes when pairing is complete. With Shell 1.3.0 or later you can
+   instead create a QR code on that page and tap the QR icon on the PC list to scan it: no PIN, and
+   the host's certificate is checked against the code (the camera permission is asked for then; a
+   device without a camera pastes the link shown under the code).
 4. Tap the PC again to see its apps, and tap an app (for example Desktop) to start streaming.
 
 While streaming, press **Back** (or tap the handle at the screen edge) for the stream settings panel.
