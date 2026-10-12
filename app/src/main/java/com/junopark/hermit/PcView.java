@@ -656,6 +656,15 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
             webHelp.setTextColor(getResources().getColor(R.color.hermit_text_secondary));
             webHelp.setPadding(0, Math.round(4 * density), 0, 0);
             content.addView(webHelp);
+
+            // Shell answers the page with an explanation when the host accepts the web UI from the
+            // PC itself only; this says what to do then.
+            TextView refusedHelp = new TextView(this);
+            refusedHelp.setText(R.string.hermit_pair_open_web_refused);
+            refusedHelp.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+            refusedHelp.setTextColor(getResources().getColor(R.color.hermit_text_secondary));
+            refusedHelp.setPadding(0, Math.round(4 * density), 0, 0);
+            content.addView(refusedHelp);
         }
 
         pairingDialog = new AlertDialog.Builder(this)

@@ -29,6 +29,7 @@
     <string name="hermit_pair_pin_timeout">No PIN was entered on the host within 5 minutes. Tap the PC to pair again.</string>
     <string name="hermit_pair_open_web">Open Shell pairing page</string>
     <string name="hermit_pair_open_web_help">The browser warns about the host\'s self-signed certificate and asks for the Shell web UI password; both are expected.</string>
+    <string name="hermit_pair_open_web_refused">If the page says access is refused, enter the PIN on the host PC or allow the local network in Shell\'s settings.</string>
     <string name="hermit_pair_no_browser">No browser to open the pairing page. Enter the PIN on the host\'s pairing page yourself.</string>
     <string name="hermit_shield_hdr_firmware">Update the firmware on your NVIDIA SHIELD Android TV to enable HDR</string>
     <string name="hermit_conn_version_malformed">Server version malformed</string>

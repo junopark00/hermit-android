@@ -180,6 +180,8 @@ hermit = [
     ('hermit_pair_open_web', 'Open Shell pairing page', 'Shell 페어링 페이지 열기'),
     ('hermit_pair_open_web_help', 'The browser warns about the host\'s self-signed certificate and asks for the Shell web UI password; both are expected.',
      '브라우저가 호스트의 자체 서명 인증서를 경고하고 Shell 웹 UI 비밀번호를 묻는 것은 정상입니다.'),
+    ('hermit_pair_open_web_refused', 'If the page says access is refused, enter the PIN on the host PC or allow the local network in Shell\'s settings.',
+     '페이지에 접근이 거부되었다고 나오면 호스트 PC에서 PIN을 입력하거나 Shell 설정에서 로컬 네트워크를 허용하세요.'),
     ('hermit_pair_no_browser', 'No browser to open the pairing page. Enter the PIN on the host\'s pairing page yourself.',
      '페어링 페이지를 열 브라우저가 없습니다. 호스트의 페어링 페이지에 PIN을 직접 입력하세요.'),
     ('hermit_shield_hdr_firmware', 'Update the firmware on your NVIDIA SHIELD Android TV to enable HDR', 'HDR을 쓰려면 NVIDIA SHIELD Android TV 펌웨어를 업데이트하세요'),

@@ -46,8 +46,10 @@ extensions that only Shell provides; they are marked **(Shell)** below.
   you only confirm. The page is `https://<host>:<web UI port>/pin` (the web UI port is the host's
   HTTP port + 1, 47990 by default). The PIN and name are in the URL fragment, so they do not reach
   the host's request log. The browser warns about the host's self-signed certificate and asks for
-  the Shell web UI password; both are expected. Other open-source hosts show their own pairing page
-  without the prefill.
+  the Shell web UI password; both are expected. If the page says **The web UI is not available from
+  this device**, the host (Shell 1.1.2 or later) accepts the web UI from the PC itself only: enter the
+  PIN on the host PC, or have **Settings > Network > Web UI Access** in Shell changed to the local
+  network. Other open-source hosts show their own pairing page without the prefill.
 - Hermit has its own application ID, so it can be installed next to other GameStream clients. Its
   pairing and settings are stored separately.
 

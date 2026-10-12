@@ -29,6 +29,7 @@
     <string name="hermit_pair_pin_timeout">5분 안에 호스트에 PIN이 입력되지 않았습니다. PC를 다시 탭해 페어링하세요.</string>
     <string name="hermit_pair_open_web">Shell 페어링 페이지 열기</string>
     <string name="hermit_pair_open_web_help">브라우저가 호스트의 자체 서명 인증서를 경고하고 Shell 웹 UI 비밀번호를 묻는 것은 정상입니다.</string>
+    <string name="hermit_pair_open_web_refused">페이지에 접근이 거부되었다고 나오면 호스트 PC에서 PIN을 입력하거나 Shell 설정에서 로컬 네트워크를 허용하세요.</string>
     <string name="hermit_pair_no_browser">페어링 페이지를 열 브라우저가 없습니다. 호스트의 페어링 페이지에 PIN을 직접 입력하세요.</string>
     <string name="hermit_shield_hdr_firmware">HDR을 쓰려면 NVIDIA SHIELD Android TV 펌웨어를 업데이트하세요</string>
     <string name="hermit_conn_version_malformed">서버 버전 정보가 올바르지 않습니다</string>
