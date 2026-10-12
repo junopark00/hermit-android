@@ -51,6 +51,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Scans a Shell QR pairing code (notes/DESIGN-I-qr-pairing.md, section 6.3): camera2, the back
@@ -73,6 +75,8 @@ public class QrScanActivity extends Activity {
     private static final int MAX_PREVIEW_WIDTH = 1920;
     private static final int MAX_PREVIEW_HEIGHT = 1080;
     private static final long MIN_DECODE_INTERVAL_MS = 100;
+    // How long closeCamera() waits for an open in progress to report back
+    private static final long CAMERA_LOCK_TIMEOUT_MS = 2500;
 
     private TextureView textureView;
     private HandlerThread cameraThread;
@@ -83,6 +87,10 @@ public class QrScanActivity extends Activity {
     private Size previewSize;
     // Set once a link was found or the activity is leaving; later frames and callbacks are ignored
     private volatile boolean finished;
+    // Held from openCamera() until the open reports back (onOpened, onDisconnected, onError), and
+    // by closeCamera() while it closes: an open in progress is never left behind when the
+    // activity pauses (Camera2Basic pattern)
+    private final Semaphore cameraOpenCloseLock = new Semaphore(1);
     private long lastDecodeAt;
     private final MultiFormatReader reader = new MultiFormatReader();
 
@@ -219,8 +227,8 @@ public class QrScanActivity extends Activity {
         });
     }
 
-    // openCamera, startPreview, closeCamera and the camera callbacks are synchronized: the UI
-    // thread closes while the camera thread may still be opening
+    // openCamera, startPreview, the camera callbacks and the closing itself are synchronized: the
+    // UI thread closes while the camera thread may still be opening
     private synchronized void openCamera() {
         if (cameraDevice != null || finished || cameraHandler == null) {
             return;
@@ -265,39 +273,60 @@ public class QrScanActivity extends Activity {
                 failCamera("no permission");
                 return;
             }
-            manager.openCamera(cameraId, new CameraDevice.StateCallback() {
-                @Override
-                public void onOpened(CameraDevice camera) {
-                    synchronized (QrScanActivity.this) {
-                        if (finished) {
-                            camera.close();
-                            return;
+            if (!cameraOpenCloseLock.tryAcquire(CAMERA_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                failCamera("timed out waiting to lock the camera");
+                return;
+            }
+            boolean opening = false;
+            try {
+                manager.openCamera(cameraId, new CameraDevice.StateCallback() {
+                    @Override
+                    public void onOpened(CameraDevice camera) {
+                        synchronized (QrScanActivity.this) {
+                            if (finished) {
+                                // The activity paused meanwhile: nothing may stay open
+                                camera.close();
+                                cameraOpenCloseLock.release();
+                                return;
+                            }
+                            cameraDevice = camera;
                         }
-                        cameraDevice = camera;
+                        cameraOpenCloseLock.release();
                         startPreview();
                     }
-                }
 
-                @Override
-                public void onDisconnected(CameraDevice camera) {
-                    synchronized (QrScanActivity.this) {
-                        camera.close();
-                        cameraDevice = null;
+                    @Override
+                    public void onDisconnected(CameraDevice camera) {
+                        synchronized (QrScanActivity.this) {
+                            camera.close();
+                            cameraDevice = null;
+                        }
+                        cameraOpenCloseLock.release();
+                        failCamera("camera disconnected");
                     }
-                    failCamera("camera disconnected");
-                }
 
-                @Override
-                public void onError(CameraDevice camera, int error) {
-                    synchronized (QrScanActivity.this) {
-                        camera.close();
-                        cameraDevice = null;
+                    @Override
+                    public void onError(CameraDevice camera, int error) {
+                        synchronized (QrScanActivity.this) {
+                            camera.close();
+                            cameraDevice = null;
+                        }
+                        cameraOpenCloseLock.release();
+                        failCamera("camera error " + error);
                     }
-                    failCamera("camera error " + error);
+                }, cameraHandler);
+                opening = true;
+            } finally {
+                if (!opening) {
+                    // openCamera threw: no callback will release the lock
+                    cameraOpenCloseLock.release();
                 }
-            }, cameraHandler);
+            }
         } catch (CameraAccessException | IllegalArgumentException | SecurityException e) {
             failCamera(e.getClass().getSimpleName() + ": " + e.getMessage());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            failCamera("interrupted");
         }
     }
 
@@ -361,18 +390,36 @@ public class QrScanActivity extends Activity {
         }
     }
 
-    private synchronized void closeCamera() {
-        if (captureSession != null) {
-            captureSession.close();
-            captureSession = null;
-        }
-        if (cameraDevice != null) {
-            cameraDevice.close();
-            cameraDevice = null;
-        }
-        if (imageReader != null) {
-            imageReader.close();
-            imageReader = null;
+    // Waits (bounded) for an open in progress to report back first, so its device is closed here
+    // or, once finished is set, by onOpened itself; the monitor is taken only after the wait, as
+    // onOpened needs it to release the lock
+    private void closeCamera() {
+        boolean locked = false;
+        try {
+            locked = cameraOpenCloseLock.tryAcquire(CAMERA_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+            if (!locked) {
+                HermitLog.warning("QR scanner: the camera open did not report back in time");
+            }
+            synchronized (this) {
+                if (captureSession != null) {
+                    captureSession.close();
+                    captureSession = null;
+                }
+                if (cameraDevice != null) {
+                    cameraDevice.close();
+                    cameraDevice = null;
+                }
+                if (imageReader != null) {
+                    imageReader.close();
+                    imageReader = null;
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
+            if (locked) {
+                cameraOpenCloseLock.release();
+            }
         }
     }
 
