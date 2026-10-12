@@ -13,6 +13,8 @@ import com.junopark.hermit.computers.ComputerManagerService;
 import com.junopark.hermit.grid.PcGridAdapter;
 import com.junopark.hermit.grid.assets.DiskAssetLoader;
 import com.junopark.hermit.hermit.CrashReporter;
+import com.junopark.hermit.hermit.QrPairingLink;
+import com.junopark.hermit.hermit.QrScanActivity;
 import com.junopark.hermit.hermit.RemoteShutdown;
 import com.junopark.hermit.hermit.SessionSummary;
 import com.junopark.hermit.hermit.ShellPairingPage;
@@ -35,6 +37,7 @@ import com.junopark.hermit.utils.ServerHelper;
 import com.junopark.hermit.utils.ShortcutHelper;
 import com.junopark.hermit.utils.UiHelper;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.AlertDialog;
@@ -42,6 +45,7 @@ import android.app.Service;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.opengl.GLSurfaceView;
 import android.os.Build;
@@ -49,6 +53,7 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.os.SystemClock;
 import android.preference.PreferenceManager;
+import android.text.InputType;
 import android.util.TypedValue;
 import android.view.ContextMenu;
 import android.view.Gravity;
@@ -61,6 +66,7 @@ import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
@@ -203,6 +209,11 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 HelpLauncher.launchSetupGuide(PcView.this);
             }
         });
+        // Hermit: pairing with a QR code from the host's web UI
+        View pairWithQrButton = findViewById(R.id.pairWithQr);
+        if (pairWithQrButton != null) {
+            pairWithQrButton.setOnClickListener(v -> startQrPairing());
+        }
 
         // Amazon review didn't like the help button because the wiki was not entirely
         // navigable via the Fire TV remote (though the relevant parts were). Let's hide
@@ -459,17 +470,180 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
             HermitNotice.show(PcView.this, getResources().getString(R.string.error_manager_not_running), HermitNotice.LONG);
             return;
         }
+        startPairing(computer, null);
+    }
 
+    // ---- Hermit: QR pairing (notes/DESIGN-I-qr-pairing.md) ------------------------------------
+
+    private static final int QR_SCAN_REQUEST = 1;
+    private static final int CAMERA_PERMISSION_REQUEST = 1;
+
+    // "Pair with QR" on the PC list: the scanner when this device has a camera and the permission
+    // (asked for here, and only here), else a field to paste the link into
+    private void startQrPairing() {
+        if (managerBinder == null) {
+            HermitNotice.show(PcView.this, getResources().getString(R.string.error_manager_not_running), HermitNotice.LONG);
+            return;
+        }
+        if (!QrScanActivity.canScan(this)) {
+            showQrLinkDialog();
+        }
+        else if (QrScanActivity.hasCameraPermission(this)) {
+            startQrScanner();
+        }
+        else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            requestPermissions(new String[] { Manifest.permission.CAMERA }, CAMERA_PERMISSION_REQUEST);
+        }
+    }
+
+    private void startQrScanner() {
+        startActivityForResult(new Intent(this, QrScanActivity.class), QR_SCAN_REQUEST);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != CAMERA_PERMISSION_REQUEST) {
+            return;
+        }
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            startQrScanner();
+        }
+        else {
+            // Denied: the link can still be pasted
+            showQrLinkDialog();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != QR_SCAN_REQUEST) {
+            return;
+        }
+        if (resultCode == RESULT_OK && data != null) {
+            pairByLink(data.getStringExtra(QrScanActivity.EXTRA_LINK));
+        }
+        else if (resultCode == QrScanActivity.RESULT_CAMERA_FAILED) {
+            HermitNotice.show(PcView.this, getResources().getString(R.string.hermit_qr_camera_failed), HermitNotice.LONG);
+            showQrLinkDialog();
+        }
+    }
+
+    // The fallback for a device without a usable camera (Android TV, permission denied): the same
+    // link, pasted. Nothing is read from the clipboard on its own.
+    private void showQrLinkDialog() {
+        if (isFinishing()) {
+            return;
+        }
+        float density = getResources().getDisplayMetrics().density;
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        int pad = Math.round(24 * density);
+        content.setPadding(pad, Math.round(8 * density), pad, 0);
+
+        TextView help = new TextView(this);
+        help.setText(R.string.hermit_qr_paste_help);
+        help.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        help.setTextColor(getResources().getColor(R.color.hermit_text_secondary));
+        content.addView(help);
+
+        final EditText linkField = new EditText(this);
+        linkField.setHint(R.string.hermit_qr_paste_hint);
+        linkField.setSingleLine(true);
+        linkField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI
+                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.topMargin = Math.round(12 * density);
+        content.addView(linkField, params);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.hermit_qr_paste_title)
+                .setView(content)
+                .setPositiveButton(R.string.pcview_menu_pair_pc, (d, w) -> pairByLink(linkField.getText().toString()))
+                .setNegativeButton(R.string.hermit_action_cancel, null)
+                .create();
+        dialog.show();
+    }
+
+    // Validates the link without touching the network, then pairs with the host it names
+    private void pairByLink(String text) {
+        QrPairingLink link;
+        try {
+            link = QrPairingLink.parse(text);
+        } catch (QrPairingLink.InvalidLinkException e) {
+            int message = e.problem == QrPairingLink.Problem.UNSUPPORTED_VERSION
+                    ? R.string.hermit_qr_unsupported_version : R.string.hermit_qr_not_link;
+            HermitNotice.show(PcView.this, getResources().getString(message), HermitNotice.LONG);
+            return;
+        }
+        if (managerBinder == null) {
+            HermitNotice.show(PcView.this, getResources().getString(R.string.error_manager_not_running), HermitNotice.LONG);
+            return;
+        }
+        HermitLog.info("QR pairing with " + link);
+        startPairing(null, link);
+    }
+
+    /** The string for a host's QR_<reason> refusal (the table in the design, section 4.4). */
+    private static int qrRefusalMessage(QrPairingLink.Refusal refusal) {
+        switch (refusal) {
+            case USED:
+                return R.string.hermit_qr_used;
+            case EXPIRED:
+                return R.string.hermit_qr_expired;
+            case NETWORK:
+                return R.string.hermit_qr_network;
+            case NONE:
+            default:
+                return R.string.hermit_qr_none;
+        }
+    }
+
+    // Hermit: one pairing flow. With a known PC and no link: the PIN pairing. With a link: the PC
+    // is added (or the existing entry used) first, then the token takes the PIN's place, the host
+    // must advertise qrPairing, getservercert names the QR record and the certificate must match
+    // the link before pairing goes on (PairingManager).
+    private void startPairing(final ComputerDetails knownComputer, final QrPairingLink qr) {
         // Hermit: no "Pairing" toast; the PIN dialog shows that pairing is under way
         final java.util.concurrent.atomic.AtomicBoolean cancelled = new java.util.concurrent.atomic.AtomicBoolean();
         final Object attempt = new Object();
         final int generation = pairingGeneration.incrementAndGet();
-        final String uniqueId = NvHTTP.pairingUniqueId(computer, managerBinder.getUniqueId());
+        // What Cancel withdraws: the PC and the ID this attempt pairs under (a QR pairing learns
+        // them once the PC is added) and the connection in flight
+        final java.util.concurrent.atomic.AtomicReference<ComputerDetails> target =
+                new java.util.concurrent.atomic.AtomicReference<>(knownComputer);
+        final java.util.concurrent.atomic.AtomicReference<String> targetUniqueId =
+                new java.util.concurrent.atomic.AtomicReference<>(
+                        knownComputer != null ? NvHTTP.pairingUniqueId(knownComputer, managerBinder.getUniqueId()) : null);
+        final java.util.concurrent.atomic.AtomicReference<NvHTTP> pairingConn =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        final Runnable onCancel = () -> {
+            cancelled.set(true);
+            new Thread(() -> {
+                NvHTTP conn = pairingConn.get();
+                if (conn != null) {
+                    conn.cancelPendingRequests();
+                }
+                ComputerDetails t = target.get();
+                String id = targetUniqueId.get();
+                if (t != null && id != null) {
+                    withdrawPairing(t, id, generation);
+                }
+            }).start();
+        };
+        if (qr != null) {
+            // Up from the start: adding the PC takes a moment too
+            showQrPairingDialog(qr, attempt, onCancel);
+        }
         new Thread(new Runnable() {
             @Override
             public void run() {
+                ComputerDetails computer = knownComputer;
+                String uniqueId = targetUniqueId.get();
                 NvHTTP httpConn;
-                String message;
+                String message = null;
                 boolean success = false;
                 long pairingStartedAt = 0;
                 PairingManager pm = null;
@@ -477,67 +651,114 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                     // Stop updates and wait while pairing
                     stopComputerUpdates(true);
 
-                    httpConn = new NvHTTP(ServerHelper.getCurrentAddressFromComputer(computer),
-                            computer.httpsPort, uniqueId, computer.serverCert,
-                            PlatformBinding.getCryptoProvider(PcView.this));
-                    if (httpConn.getPairState() == PairState.PAIRED) {
-                        // Don't display any toast, but open the app list
-                        message = null;
-                        success = true;
-                    }
-                    else {
-                        final String pinStr = PairingManager.generatePinString();
-                        final NvHTTP pairingConn = httpConn;
-
-                        // Hermit: a PIN dialog that stays up until pairing ends; Cancel aborts it
-                        runOnUiThread(() -> showPairingDialog(computer, pinStr, attempt, () -> {
-                            cancelled.set(true);
-                            new Thread(() -> {
-                                pairingConn.cancelPendingRequests();
-                                withdrawPairing(computer, uniqueId, generation);
-                            }).start();
-                        }));
-
-                        pm = httpConn.getPairingManager();
-
-                        synchronized (pairingWithdrawLock) {
-                            // Waits for an earlier, cancelled attempt's withdrawal to be sent
-                        }
-
-                        String serverInfo = httpConn.getServerInfo(true);
-                        pairingStartedAt = SystemClock.elapsedRealtime();
-                        PairState pairState = pm.pair(serverInfo, pinStr);
-                        if (pairState == PairState.PIN_WRONG) {
-                            message = getResources().getString(R.string.pair_incorrect_pin);
-                        }
-                        else if (pairState == PairState.FAILED) {
-                            if (computer.runningGameId != 0) {
-                                message = getResources().getString(R.string.pair_pc_ingame);
-                            }
-                            else {
-                                message = getResources().getString(R.string.pair_fail);
-                            }
-                        }
-                        else if (pairState == PairState.ALREADY_IN_PROGRESS) {
-                            message = getResources().getString(R.string.pair_already_in_progress);
-                        }
-                        else if (pairState == PairState.PAIRED) {
-                            // Just navigate to the app view without displaying a toast
-                            message = null;
-                            success = true;
-
-                            // Pin this certificate for later HTTPS use
-                            managerBinder.getComputer(computer.uuid).serverCert = pm.getPairedCert();
-
-                            // Invalidate reachability information after pairing to force
-                            // a refresh before reading pair state again
-                            managerBinder.invalidateStateForComputer(computer.uuid);
+                    if (qr != null) {
+                        // The host the link names, added like a manually added PC (an entry with
+                        // the same uuid is updated, not duplicated)
+                        ComputerDetails details = new ComputerDetails();
+                        details.manualAddress = new ComputerDetails.AddressTuple(qr.host, qr.port);
+                        if (!managerBinder.addComputerBlocking(details)) {
+                            message = getResources().getString(R.string.addpc_fail);
                         }
                         else {
-                            // Should be no other values
-                            message = null;
+                            computer = managerBinder.getComputer(details.uuid);
+                            if (computer == null) {
+                                computer = details;
+                            }
+                            uniqueId = NvHTTP.pairingUniqueId(computer, managerBinder.getUniqueId());
+                            target.set(computer);
+                            targetUniqueId.set(uniqueId);
                         }
                     }
+
+                    if (message != null || cancelled.get()) {
+                        // Nothing to pair with (or Cancel came while the PC was being added)
+                    }
+                    else {
+                        httpConn = new NvHTTP(ServerHelper.getCurrentAddressFromComputer(computer),
+                                computer.httpsPort, uniqueId, computer.serverCert,
+                                PlatformBinding.getCryptoProvider(PcView.this));
+                        if (httpConn.getPairState() == PairState.PAIRED) {
+                            if (qr != null) {
+                                message = getResources().getString(R.string.hermit_qr_already_paired);
+                            }
+                            else {
+                                // Don't display any toast, but open the app list
+                                message = null;
+                                success = true;
+                            }
+                        }
+                        else {
+                            // The PIN, or the QR link's token in its place (never shown or logged)
+                            final String pinStr = qr != null ? qr.token : PairingManager.generatePinString();
+                            pairingConn.set(httpConn);
+
+                            if (qr == null) {
+                                // Hermit: a PIN dialog that stays up until pairing ends; Cancel aborts it
+                                final ComputerDetails dialogComputer = computer;
+                                runOnUiThread(() -> showPairingDialog(dialogComputer, pinStr, attempt, onCancel));
+                            }
+
+                            pm = httpConn.getPairingManager();
+
+                            synchronized (pairingWithdrawLock) {
+                                // Waits for an earlier, cancelled attempt's withdrawal to be sent
+                            }
+
+                            String serverInfo = httpConn.getServerInfo(true);
+                            if (qr != null && !NvHTTP.supportsQrPairing(serverInfo)) {
+                                // An older Shell would wait for a PIN instead: no request is sent.
+                                // The PC stays on the list for PIN pairing.
+                                message = getResources().getString(R.string.hermit_qr_host_too_old);
+                            }
+                            else {
+                                pairingStartedAt = SystemClock.elapsedRealtime();
+                                PairingManager.QrPairing qrPairing = qr != null
+                                        ? new PairingManager.QrPairing(qr.id, qr.fingerprint, ShellPairingPage.deviceName(PcView.this))
+                                        : null;
+                                PairState pairState = pm.pair(serverInfo, pinStr, qrPairing);
+                                if (pairState == PairState.PIN_WRONG) {
+                                    // With a QR code the key came from the link, so a damaged code is the only cause
+                                    message = getResources().getString(qr != null ? R.string.hermit_qr_damaged : R.string.pair_incorrect_pin);
+                                }
+                                else if (pairState == PairState.FAILED) {
+                                    if (computer.runningGameId != 0) {
+                                        message = getResources().getString(R.string.pair_pc_ingame);
+                                    }
+                                    else {
+                                        message = getResources().getString(R.string.pair_fail);
+                                    }
+                                }
+                                else if (pairState == PairState.ALREADY_IN_PROGRESS) {
+                                    message = getResources().getString(R.string.pair_already_in_progress);
+                                }
+                                else if (pairState == PairState.CERT_MISMATCH) {
+                                    message = getResources().getString(R.string.hermit_qr_cert_mismatch);
+                                }
+                                else if (pairState == PairState.NO_ANSWER) {
+                                    message = getResources().getString(R.string.hermit_qr_no_answer);
+                                }
+                                else if (pairState == PairState.PAIRED) {
+                                    // Just navigate to the app view without displaying a toast
+                                    message = null;
+                                    success = true;
+
+                                    // Pin this certificate for later HTTPS use
+                                    managerBinder.getComputer(computer.uuid).serverCert = pm.getPairedCert();
+
+                                    // Invalidate reachability information after pairing to force
+                                    // a refresh before reading pair state again
+                                    managerBinder.invalidateStateForComputer(computer.uuid);
+                                }
+                                else {
+                                    // Should be no other values
+                                    message = null;
+                                }
+                            }
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    // addComputerBlocking: the service is going away
+                    message = getResources().getString(R.string.addpc_fail);
                 } catch (UnknownHostException e) {
                     message = getResources().getString(R.string.error_unknown_host);
                 } catch (FileNotFoundException e) {
@@ -545,8 +766,14 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 } catch (XmlPullParserException | IOException e) {
                     e.printStackTrace();
                     message = ServerHelper.describeHostError(PcView.this, e);
+                    // The host refused the QR record (none, expired, used, not from the local network)
+                    QrPairingLink.Refusal refusal = qr != null && e instanceof HostHttpResponseException
+                            ? QrPairingLink.refusalOf(((HostHttpResponseException) e).getErrorMessage()) : null;
+                    if (refusal != null) {
+                        message = getResources().getString(qrRefusalMessage(refusal));
+                    }
                     // Only while getservercert was waiting for the PIN: a later step failing is a real error
-                    if (e instanceof IOException && !(e instanceof HostHttpResponseException) && pairingStartedAt != 0
+                    if (qr == null && e instanceof IOException && !(e instanceof HostHttpResponseException) && pairingStartedAt != 0
                             && !pm.isServerCertAnswered()
                             && SystemClock.elapsedRealtime() - pairingStartedAt >= PAIRING_PIN_WINDOW_MS) {
                         message = getResources().getString(R.string.hermit_pair_pin_timeout);
@@ -565,6 +792,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
 
                 final String toastMessage = message;
                 final boolean toastSuccess = success;
+                final ComputerDetails pairedComputer = computer;
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
@@ -586,12 +814,12 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                             // Paired from the browser (Shell pairing page): Android blocks an
                             // activity launch from the background, so the app list opens when
                             // the user comes back
-                            pendingAppList = computer;
+                            pendingAppList = pairedComputer;
                             startComputerUpdates();
                         }
                         else if (toastSuccess) {
                             // Open the app list after a successful pairing attempt
-                            doAppList(computer, true, false);
+                            doAppList(pairedComputer, true, false);
                         }
                         else {
                             // Start polling again if we're still in the foreground
@@ -601,6 +829,24 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 });
             }
         }).start();
+    }
+
+    // Hermit: the QR pairing in progress: no PIN to show, only the host and Cancel
+    private void showQrPairingDialog(QrPairingLink link, Object attempt, Runnable onCancel) {
+        if (isFinishing()) {
+            return;
+        }
+        dismissPairingDialog();
+        pairingAttempt = attempt;
+        String where = link.host + ":" + link.port;
+        pairingDialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.hermit_qr_pairing_title)
+                .setMessage(link.name != null ? link.name + "\n" + where : where)
+                .setNegativeButton(R.string.hermit_action_cancel, (d, w) -> onCancel.run())
+                .setOnCancelListener(d -> onCancel.run())
+                .create();
+        pairingDialog.setCanceledOnTouchOutside(false);
+        pairingDialog.show();
     }
 
     // Hermit: aborting the request leaves the attempt waiting on the host, which could still give

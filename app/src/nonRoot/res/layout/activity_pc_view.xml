@@ -52,6 +52,18 @@
             android:tint="@color/hermit_text_primary" />
 
         <ImageButton
+            android:id="@+id/pairWithQr"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:contentDescription="@string/hermit_qr_pair_action"
+            android:padding="12dp"
+            android:preferKeepClear="true"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_qr"
+            android:tint="@color/hermit_text_primary" />
+
+        <ImageButton
             android:id="@+id/manuallyAddPc"
             style="?android:attr/borderlessButtonStyle"
             android:layout_width="48dp"

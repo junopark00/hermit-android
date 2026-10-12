@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CAPTURE_KEYBOARD" />
+    <!-- Hermit: QR pairing scans the host's QR code; asked for only when "Pair with QR" is tapped -->
+    <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="com.android.providers.tv.permission.READ_EPG_DATA"/>
     <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA"/>
 
@@ -35,6 +37,10 @@
         android:required="false" />
     <uses-feature
         android:name="android.hardware.sensor.gyroscope"
+        android:required="false" />
+    <!-- Hermit: a device without a camera (Android TV) pastes the QR pairing link instead -->
+    <uses-feature
+        android:name="android.hardware.camera.any"
         android:required="false" />
 
     <!-- Disable legacy input emulation on ChromeOS -->
@@ -148,6 +154,18 @@
             android:enableOnBackInvokedCallback="true"
             android:configChanges="mcc|mnc|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection"
             android:label="@string/hermit_label_add_computer">
+            <meta-data android:name="WindowManagerPreference:FreeformWindowSize" android:value="system-default" />
+            <meta-data android:name="WindowManagerPreference:FreeformWindowOrientation" android:value="landscape" />
+        </activity>
+        <!-- Hermit: the QR pairing scanner (camera2 + ZXing); no hermit:// intent filter, a link
+             from another app never starts a pairing -->
+        <activity
+            android:name=".hermit.QrScanActivity"
+            android:exported="false"
+            android:resizeableActivity="true"
+            android:enableOnBackInvokedCallback="true"
+            android:configChanges="mcc|mnc|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection"
+            android:label="@string/hermit_label_scan_qr">
             <meta-data android:name="WindowManagerPreference:FreeformWindowSize" android:value="system-default" />
             <meta-data android:name="WindowManagerPreference:FreeformWindowOrientation" android:value="landscape" />
         </activity>
