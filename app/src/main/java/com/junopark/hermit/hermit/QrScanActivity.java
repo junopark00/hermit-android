@@ -273,8 +273,9 @@ public class QrScanActivity extends Activity {
                 failCamera("no permission");
                 return;
             }
-            if (!cameraOpenCloseLock.tryAcquire(CAMERA_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-                failCamera("timed out waiting to lock the camera");
+            // Another open is still in progress (its callback needs this monitor to release the
+            // lock): leave it to finish instead of waiting here and timing out
+            if (!cameraOpenCloseLock.tryAcquire()) {
                 return;
             }
             boolean opening = false;
