@@ -42,7 +42,6 @@ public class RemoteShutdown {
     private final Activity activity;
     private final ComputerDetails computer;
     private final String uniqueId;
-    /** One of SHUTDOWN, RESTART, SLEEP or HIBERNATE. */
     private final String action;
     private AlertDialog progress;
     private boolean cancelled;

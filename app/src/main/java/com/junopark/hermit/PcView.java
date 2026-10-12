@@ -156,11 +156,8 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     private final static int SLEEP_PC_ID = 14;
     private final static int HIBERNATE_PC_ID = 15;
 
-    // Hermit: what each online, paired host answered to the power query (whether it can sleep or
-    // hibernate), by uuid, so the long-press menu only offers what works. Asked once when the PC
-    // is seen online (a failed network attempt is tried again after a minute; a host without the
-    // request, such as Sunshine, is remembered as offering nothing) and forgotten when it goes
-    // offline. Main thread only.
+    // Hermit: what each online, paired host can do (sleep, hibernate), by uuid, so the long-press
+    // menu only offers what works; forgotten when the host goes offline. Main thread only.
     private final HashMap<String, NvHTTP.PowerState> powerStates = new HashMap<>();
     private final HashSet<String> powerQueriesPending = new HashSet<>();
     private final HashMap<String, Long> powerQueryRetryAt = new HashMap<>();
@@ -972,8 +969,9 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     }
 
     /**
-     * Hermit: asks the host (once per time it is seen online) which power actions it supports.
-     * Main thread; the request runs on its own thread and nothing is sent to the PC but the query.
+     * Hermit: asks the host (once per time it is seen online) which power actions it supports;
+     * a host without the request, such as Sunshine, is remembered as offering nothing.
+     * Main thread; the request runs on its own thread.
      */
     private void queryPowerState(ComputerDetails details) {
         if (managerBinder == null || powerStates.containsKey(details.uuid) || powerQueriesPending.contains(details.uuid)) {
